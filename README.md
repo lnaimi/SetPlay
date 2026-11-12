@@ -3,9 +3,9 @@
 # ⚽ Set `▶` **Play** 🎬
 ### *The Luxury Dual-APK (Phone + Android TV 10-Foot) MENA Sports Match Center & High-Scale Xtream IPTV Cinema Suite*
 
-[![Build & Release SetPlay APK](https://img.shields.io/github/actions/workflow/status/MPadberg-svg/SetPlay/android-apk-release.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=Dual-APK%20Release)](https://github.com/MPadberg-svg/SetPlay/actions/workflows/android-apk-release.yml)
-[![Download SetPlay-Phone.apk](https://img.shields.io/badge/📱_Phone_APK-SetPlay--Phone.apk-14919B?style=for-the-badge&logo=android&logoColor=white)](https://github.com/MPadberg-svg/SetPlay/releases/latest/download/SetPlay-Phone.apk)
-[![Download SetPlay-TV.apk](https://img.shields.io/badge/📺_Android_TV_APK-SetPlay--TV.apk-FFB800?style=for-the-badge&logo=androidtv&logoColor=06131C)](https://github.com/MPadberg-svg/SetPlay/releases/latest/download/SetPlay-TV.apk)
+[![Build & Release SetPlay APK](https://img.shields.io/github/actions/workflow/status/MPadberg-svg/SetPlay/android-apk-release.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=Dual-APK%20Release)](https://github.com/lnaimi/SetPlay/actions/workflows/android-apk-release.yml)
+[![Download SetPlay-Phone.apk](https://img.shields.io/badge/📱_Phone_APK-SetPlay--Phone.apk-14919B?style=for-the-badge&logo=android&logoColor=white)](https://github.com/lnaimi/SetPlay/releases/latest/download/SetPlay-Phone.apk)
+[![Download SetPlay-TV.apk](https://img.shields.io/badge/📺_Android_TV_APK-SetPlay--TV.apk-FFB800?style=for-the-badge&logo=androidtv&logoColor=06131C)](https://github.com/lnaimi/SetPlay/releases/latest/download/SetPlay-TV.apk)
 [![Kotlin & Jetpack Compose](https://img.shields.io/badge/Kotlin_2.0-Jetpack_Compose_M3-F07167?style=for-the-badge&logo=jetpackcompose&logoColor=white)](#)
 
 ---
@@ -26,14 +26,14 @@ Download the specialized **Set ▶ Play** APK built for your device (**Android 7
 
 | Edition | Target Devices & UX Shell | 🚀 Direct 1-Click Release Download | 📦 GitHub Actions Artifact |
 | :--- | :--- | :---: | :---: |
-| 📱 **`SetPlay-Phone.apk`**<br>*(Touch & Companion Edition)* | **Android Phones, Tablets & Foldables**<br>Top/Bottom Sculpted Glass Nav • Draggable Floating PiP • `52.dp` Wi-Fi TV Companion Bar | [**⬇️ Download `SetPlay-Phone.apk`**](https://github.com/MPadberg-svg/SetPlay/releases/latest/download/SetPlay-Phone.apk) | `SetPlay-Phone-APK` |
-| 📺 **`SetPlay-TV.apk`**<br>*(10-Foot Living Room Edition)* | **Android TV, Google TV & Fire TV**<br>`sensorLandscape` • Left Glass Navigation Rail • In-Player Channel Zapper Sidebar • 2-Stage Back Guard | [**⬇️ Download `SetPlay-TV.apk`**](https://github.com/MPadberg-svg/SetPlay/releases/latest/download/SetPlay-TV.apk) | `SetPlay-TV-APK` |
+| 📱 **`SetPlay-Phone.apk`**<br>*(Touch & Companion Edition)* | **Android Phones, Tablets & Foldables**<br>Top/Bottom Sculpted Glass Nav • Draggable Floating PiP • `52.dp` Wi-Fi TV Companion Bar | [**⬇️ Download `SetPlay-Phone.apk`**](https://github.com/lnaimi/SetPlay/releases/latest/download/SetPlay-Phone.apk) | `SetPlay-Phone-APK` |
+| 📺 **`SetPlay-TV.apk`**<br>*(10-Foot Living Room Edition)* | **Android TV, Google TV & Fire TV**<br>`sensorLandscape` • Left Glass Navigation Rail • In-Player Channel Zapper Sidebar • 2-Stage Back Guard | [**⬇️ Download `SetPlay-TV.apk`**](https://github.com/lnaimi/SetPlay/releases/latest/download/SetPlay-TV.apk) | `SetPlay-TV-APK` |
 
 </div>
 
 ### 🛠️ Quick Installation Steps
-1. **On Android Phones & Tablets**: Download **[`SetPlay-Phone.apk`](https://github.com/MPadberg-svg/SetPlay/releases/latest/download/SetPlay-Phone.apk)**, open the `.apk` file, allow installation from your browser/file manager if prompted, and tap **Install**.
-2. **On Android TV / Google TV / Fire TV**: Download **[`SetPlay-TV.apk`](https://github.com/MPadberg-svg/SetPlay/releases/latest/download/SetPlay-TV.apk)** using *Downloader*, *Send Files to TV*, or your TV browser, install it, and launch **SetPlay TV** directly from your TV home screen!
+1. **On Android Phones & Tablets**: Download **[`SetPlay-Phone.apk`](https://github.com/lnaimi/SetPlay/releases/latest/download/SetPlay-Phone.apk)**, open the `.apk` file, allow installation from your browser/file manager if prompted, and tap **Install**.
+2. **On Android TV / Google TV / Fire TV**: Download **[`SetPlay-TV.apk`](https://github.com/lnaimi/SetPlay/releases/latest/download/SetPlay-TV.apk)** using *Downloader*, *Send Files to TV*, or your TV browser, install it, and launch **SetPlay TV** directly from your TV home screen!
 
 ---
 
@@ -96,7 +96,7 @@ The workflow in [`.github/workflows/android-apk-release.yml`](.github/workflows/
 
 ### 🚀 Running a Manual Build (`both`, `phone`, or `tv`)
 You can trigger a fast on-demand build for a single edition or both editions at any time:
-1. Open the repository on GitHub and click the **[Actions](https://github.com/MPadberg-svg/SetPlay/actions/workflows/android-apk-release.yml)** tab.
+1. Open the repository on GitHub and click the **[Actions](https://github.com/lnaimi/SetPlay/actions/workflows/android-apk-release.yml)** tab.
 2. Select **Build & Release SetPlay APK** in the left sidebar.
 3. Click **Run workflow** on the right and choose your target from the **`Which APK edition to build`** dropdown:
    - **`both`** *(default)* — Builds and publishes both `SetPlay-Phone.apk` and `SetPlay-TV.apk`.
@@ -116,6 +116,6 @@ Both APKs compile cleanly out-of-the-box even with **zero secrets configured** (
 
 <div align="center">
 
-Crafted with precision for football fans & home cinema enthusiasts • **[📱 Download `SetPlay-Phone.apk`](https://github.com/MPadberg-svg/SetPlay/releases/latest/download/SetPlay-Phone.apk)** • **[📺 Download `SetPlay-TV.apk`](https://github.com/MPadberg-svg/SetPlay/releases/latest/download/SetPlay-TV.apk)**
+Crafted with precision for football fans & home cinema enthusiasts • **[📱 Download `SetPlay-Phone.apk`](https://github.com/lnaimi/SetPlay/releases/latest/download/SetPlay-Phone.apk)** • **[📺 Download `SetPlay-TV.apk`](https://github.com/lnaimi/SetPlay/releases/latest/download/SetPlay-TV.apk)**
 
 </div>
