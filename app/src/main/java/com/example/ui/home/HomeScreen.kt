@@ -1956,11 +1956,46 @@ private fun LiveAndMarqueeSpotlightCarousel(
         selectedCountryZone.isSummerTimeActive(mode = selectedSeasonTimeMode)
     }
 
+    val liveNowCount = remember(matches) {
+        matches.count { it.status == MatchStatus.LIVE || it.status == MatchStatus.HALFTIME }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 6.dp, bottom = 2.dp)
     ) {
+        // Group heading: live matches lead the carousel, so name them first.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                .testTag("kickoff_live_now_header")
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 3.dp, height = 14.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(if (liveNowCount > 0) KickoffLiveCrimson else KickoffPitchEmerald)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = if (liveNowCount > 0) "Live now" else "Top matches",
+                color = KickoffFloodlightWhite,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.weight(1f)
+            )
+            if (liveNowCount > 0) {
+                Text(
+                    text = liveNowCount.toString(),
+                    color = KickoffMistSilver,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -3455,7 +3490,7 @@ private fun FlashscoreMatchCard(
                         }
                     ),
                     modifier = Modifier
-                        .height(22.dp)
+                        .heightIn(min = 36.dp)
                         .clip(RoundedCornerShape(50))
                         .clickable {
                             if (useMatchCenterAction) {
@@ -3469,7 +3504,7 @@ private fun FlashscoreMatchCard(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.padding(horizontal = 9.dp)
+                        modifier = Modifier.padding(horizontal = 14.dp)
                     ) {
                         when {
                             isLive -> {
@@ -3478,20 +3513,20 @@ private fun FlashscoreMatchCard(
                                 Text(
                                     text = "WATCH LIVE",
                                     color = KickoffPitchBlack,
-                                    fontSize = 9.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                             }
                             isUpcoming -> {
                                 KickoffTvBroadcastIcon(
-                                    modifier = Modifier.size(11.dp),
+                                    modifier = Modifier.size(14.dp),
                                     tint = KickoffPitchEmerald
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "Watch TV",
                                     color = KickoffFloodlightWhite,
-                                    fontSize = 9.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                             }
@@ -3499,7 +3534,7 @@ private fun FlashscoreMatchCard(
                                 Text(
                                     text = "Match Center ›",
                                     color = KickoffMistSilver,
-                                    fontSize = 9.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                             }

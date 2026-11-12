@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -22,15 +24,15 @@ import kotlinx.coroutines.launch
 class LiveTvViewModel(application: Application) : AndroidViewModel(application) {
     val repository = IptvRepository.getInstance(application)
 
-    // Stage 1: Category Search Query (searches Live TV categories by name)
+    // Category search query (used by the "All categories" sheet)
     private val _categorySearchQuery = MutableStateFlow("")
     val categorySearchQuery: StateFlow<String> = _categorySearchQuery.asStateFlow()
 
-    // Stage 2: Currently selected category (null = Stage 1 Category Directory; non-null = Stage 2 Category Channels)
+    // Currently selected category filter (null = all channels)
     private val _selectedCategory = MutableStateFlow<CategoryWithCount?>(null)
     val selectedCategory: StateFlow<CategoryWithCount?> = _selectedCategory.asStateFlow()
 
-    // Stage 2: In-category channel filter query
+    // Channel search query, applied inside the selected category (or across all channels)
     private val _channelFilterQuery = MutableStateFlow("")
     val channelFilterQuery: StateFlow<String> = _channelFilterQuery.asStateFlow()
 
@@ -58,6 +60,11 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
         emptyList()
     )
 
+    // True from a channel query starting until its first page arrives (declared before
+    // `channels`, which starts collecting eagerly during construction).
+    private val _isLoadingChannels = MutableStateFlow(true)
+    val isLoadingChannels: StateFlow<Boolean> = _isLoadingChannels.asStateFlow()
+
     // Pre-warmed, persistent StateFlow of channels for the selected category with progressive paging
     val channels: StateFlow<List<StreamEntity>> = combine(
         repository.activePlaylist,
@@ -72,20 +79,22 @@ class LiveTvViewModel(application: Application) : AndroidViewModel(application) 
             limit = limit
         )
     }.flatMapLatest { params ->
-        if (params.playlistId == null || params.selectedCategory == null) {
+        if (params.playlistId == null) {
+            _isLoadingChannels.value = false
             flowOf(emptyList())
         } else {
-            val categoryFilterId = if (params.selectedCategory.categoryId == ALL_CHANNELS_CATEGORY_ID) {
-                null
-            } else {
-                params.selectedCategory.categoryId
-            }
+            // No selected category (or the "All" entry) = every channel; a category narrows the same list.
+            val categoryFilterId = params.selectedCategory
+                ?.categoryId
+                ?.takeUnless { it == ALL_CHANNELS_CATEGORY_ID }
             repository.searchLiveChannels(
                 playlistId = params.playlistId,
                 query = params.filterQuery.trim(),
                 categoryId = categoryFilterId,
                 limit = params.limit
             )
+                .onStart { _isLoadingChannels.value = true }
+                .onEach { _isLoadingChannels.value = false }
         }
     }.stateIn(
         viewModelScope,

@@ -154,6 +154,7 @@ import com.example.ui.player.PlayerScreen
 import com.example.ui.player.PlayerViewModel
 import com.example.ui.playlists.PlaylistsScreen
 import com.example.ui.search.GlobalSearchScreen
+import com.example.ui.settings.SettingsScreen
 import com.example.data.sync.SyncRole
 import com.example.ui.sync.TvSyncCompanionBar
 import com.example.ui.sync.TvSyncModalSheet
@@ -184,6 +185,9 @@ import com.example.ui.theme.KickoffTropicalTeal
 import com.example.ui.theme.LiveCrimson
 import com.example.ui.theme.LiveRed
 import com.example.ui.theme.MetalCharcoal
+import com.example.ui.theme.MetalCharcoalElevated
+import com.example.ui.theme.ChampagneMuted
+import com.example.ui.theme.ChampagneSubtleBorder
 import com.example.ui.theme.MoviesAquamarine
 import com.example.ui.theme.MoviesAtlanticTeal
 import com.example.ui.theme.MoviesCyanTeal
@@ -322,44 +326,50 @@ fun MainAppContent(
             AppScreen.HOME -> {
                 val dayLabel = selectedMatchDay.getDynamicTitle()
                 if (activeDayMatches.isNotEmpty()) {
-                    "$dayLabel • ${activeDayMatches.size} Games • $activeDayLeaguesCount Leagues"
+                    "$dayLabel · ${activeDayMatches.size} games · $activeDayLeaguesCount leagues"
                 } else {
-                    "$dayLabel • Live Match Center"
+                    "$dayLabel · no games yet"
                 }
             }
             AppScreen.LIVE_TV -> {
                 if (activePlaylist != null && activePlaylist!!.channelCount > 0) {
-                    "%,d Channels • ${liveCategories.size} Categories".format(activePlaylist!!.channelCount)
+                    "%,d channels · ${liveCategories.size} categories".format(activePlaylist!!.channelCount)
                 } else {
-                    "Live Channels & EPG"
+                    "Connect an account to load channels"
                 }
             }
             AppScreen.MOVIES -> {
                 if (activePlaylist != null && activePlaylist!!.vodCount > 0) {
-                    "%,d Movies • ${movieCategories.size} Genres".format(activePlaylist!!.vodCount)
+                    "%,d movies · ${movieCategories.size} genres".format(activePlaylist!!.vodCount)
                 } else {
-                    "Cinema VOD Library"
+                    "Connect an account to load movies"
                 }
             }
             AppScreen.SERIES -> {
                 if (activePlaylist != null && activePlaylist!!.seriesCount > 0) {
-                    "%,d Series • ${seriesCategories.size} Genres".format(activePlaylist!!.seriesCount)
+                    "%,d series · ${seriesCategories.size} genres".format(activePlaylist!!.seriesCount)
                 } else {
-                    "Complete Seasons & Episodes"
+                    "Connect an account to load series"
                 }
             }
             AppScreen.FAVORITES -> {
                 val liveFavs = favorites.count { it.streamType.equals("live", ignoreCase = true) }
-                "${favorites.size} Saved • $liveFavs Live TV"
+                "${favorites.size} saved · $liveFavs live TV"
             }
-            AppScreen.PLAYLISTS -> activePlaylist?.name ?: "Account Management"
-            AppScreen.GLOBAL_SEARCH -> "Channels, Movies & Series"
-            AppScreen.PARENTAL_SETTINGS -> "PIN & Category Locks"
+            AppScreen.PLAYLISTS -> activePlaylist?.name ?: "No account connected"
+            AppScreen.GLOBAL_SEARCH -> "Channels, movies, series and teams"
+            AppScreen.PARENTAL_SETTINGS -> "PIN and locked categories"
+            AppScreen.SETTINGS -> activePlaylist?.let { "Signed in to ${it.name}" } ?: "Account, lock, TV pairing, zone"
         }
     }
+    val avatarInitial = remember(activePlaylist) {
+        activePlaylist?.name?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: "S"
+    }
+    val selectedCountryZone by mainViewModel.selectedCountryZone.collectAsStateWithLifecycle()
 
     var isFullScreenPlayer by remember { mutableStateOf(false) }
-    var showNavigationMenuSheet by remember { mutableStateOf(false) }
+    // TV rail takes focus once at launch, never again on later re-compositions.
+    var tvRailInitialFocusDone by remember { mutableStateOf(false) }
     var showTvSyncSheet by remember { mutableStateOf(false) }
     var openTvSyncSheetOnHostTab by remember { mutableStateOf(false) }
     var pendingStreamToPlay by remember { mutableStateOf<StreamEntity?>(null) }
@@ -498,10 +508,11 @@ fun MainAppContent(
         return
     }
 
-    // Handle back press:
-    // 1. If in fullscreen player -> minimize to Floating In-App PiP window so video continues while browsing
-    // 2. If on a secondary screen -> return to Home
-    // 3. On SetPlayEdition.TV when already on Home -> 2-Stage TV Back-Button Exit Guard (requires 2nd Back within 2500ms)
+    // One Back rule everywhere:
+    // 1. In the fullscreen player -> close full screen; on the phone playback continues in the now-playing bar
+    // 2. On Accounts / Parental lock (opened from Settings) -> back to Settings
+    // 3. On any other section -> back to KickOff
+    // 4. On KickOff, TV edition -> "Press Back again to exit" (2.5 s window)
     BackHandler(
         enabled = isFullScreenPlayer ||
             currentScreen != AppScreen.HOME ||
@@ -509,6 +520,8 @@ fun MainAppContent(
     ) {
         if (isFullScreenPlayer) {
             isFullScreenPlayer = false
+        } else if (currentScreen == AppScreen.PLAYLISTS || currentScreen == AppScreen.PARENTAL_SETTINGS) {
+            mainViewModel.setScreen(AppScreen.SETTINGS)
         } else if (currentScreen != AppScreen.HOME) {
             mainViewModel.setScreen(AppScreen.HOME)
         } else if (activeEdition == com.example.util.SetPlayEdition.TV) {
@@ -616,19 +629,8 @@ fun MainAppContent(
             }
         )
     } else {
-        val targetSectionBaseColor = when (currentScreen) {
-            AppScreen.HOME -> KickoffPitchBlack
-            AppScreen.LIVE_TV -> TvMidnightSlate
-            AppScreen.MOVIES -> MoviesSapphireNavy
-            AppScreen.SERIES -> SeriesPineBase
-            AppScreen.FAVORITES -> FavoritesObsidianBase
-            else -> DarkGraphite
-        }
-        val sectionBaseColor by animateColorAsState(
-            targetValue = targetSectionBaseColor,
-            animationSpec = tween(durationMillis = 380),
-            label = "section_base_bg"
-        )
+        // One Dark Graphite base for every section; the section palettes stay as accents only.
+        val sectionBaseColor = DarkGraphite
 
         val renderMainScreenContent: @Composable (Modifier) -> Unit = { containerModifier ->
             BoxWithConstraints(
@@ -711,6 +713,23 @@ fun MainAppContent(
                             viewModel = mainViewModel,
                             activePlaylist = activePlaylist
                         )
+                        AppScreen.SETTINGS -> SettingsScreen(
+                            activePlaylist = activePlaylist,
+                            tvSyncState = tvSyncState,
+                            activeEdition = activeEdition,
+                            selectedZoneLabel = selectedCountryZone.countryName,
+                            onOpenAccounts = { mainViewModel.setScreen(AppScreen.PLAYLISTS) },
+                            onOpenParentalLock = { mainViewModel.setScreen(AppScreen.PARENTAL_SETTINGS) },
+                            onOpenTvPairing = {
+                                openTvSyncSheetOnHostTab = activeEdition == com.example.util.SetPlayEdition.TV
+                                showTvSyncSheet = true
+                            },
+                            onOpenBroadcastZone = {
+                                mainViewModel.openCountryZoneModal()
+                                mainViewModel.setScreen(AppScreen.HOME)
+                            },
+                            onSwitchEdition = { edition -> mainViewModel.setEditionOverride(edition) }
+                        )
                     }
                 }
 
@@ -781,7 +800,7 @@ fun MainAppContent(
                         shadowElevation = 12.dp,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = 22.dp)
+                            .padding(bottom = 14.dp)
                             .testTag("tv_exit_confirm_banner")
                     ) {
                         Text(
@@ -794,40 +813,25 @@ fun MainAppContent(
                     }
                 }
 
-                // Floating Draggable In-App Picture-in-Picture (PiP) Video Window (Phone & Tablet touch edition only)
-                if (activeEdition == com.example.util.SetPlayEdition.PHONE && playerUiState.currentStream != null) {
-                    FloatingInAppPipWindow(
-                        playerViewModel = playerViewModel,
-                        stream = playerUiState.currentStream!!,
-                        isPlaying = playerUiState.isPlaying,
-                        resolutionLabel = playerUiState.resolutionLabel,
-                        maxContainerWidthPx = constraints.maxWidth.toFloat(),
-                        maxContainerHeightPx = constraints.maxHeight.toFloat(),
-                        onExpandFullScreen = { isFullScreenPlayer = true },
-                        onTogglePlayPause = { playerViewModel.togglePlayPause() },
-                        onEnterSystemPip = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && activity != null) {
-                                try {
-                                    val params = PictureInPictureParams.Builder()
-                                        .setAspectRatio(Rational(16, 9))
-                                        .build()
-                                    activity.enterPictureInPictureMode(params)
-                                } catch (_: Exception) {}
-                            }
-                        },
-                        onCloseAndStop = {
-                            playerViewModel.stopAndClosePlayer()
-                            isFullScreenPlayer = false
-                        }
-                    )
-                }
+                // While a stream plays outside the full-screen player, the phone shows
+                // PhoneNowPlayingBar above the tabs (see the Scaffold bottomBar).
             }
         }
 
         if (activeEdition == com.example.util.SetPlayEdition.TV) {
             // =========================================================================
-            // 10-FOOT WIDESCREEN ANDROID TV SHELL (`SetPlayEdition.TV`)
+            // ANDROID TV SHELL: collapsible icon rail + content
             // =========================================================================
+            val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+            var moveFocusIntoContentTick by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+            LaunchedEffect(moveFocusIntoContentTick) {
+                if (moveFocusIntoContentTick > 0) {
+                    // Wait for the section transition, then hand focus from the rail to the content.
+                    kotlinx.coroutines.delay(320L)
+                    runCatching { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Right) }
+                }
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -835,12 +839,15 @@ fun MainAppContent(
                     .testTag("main_scaffold")
             ) {
                 TvLeftNavigationRail(
+                    requestInitialFocus = !tvRailInitialFocusDone,
+                    onInitialFocusRequested = { tvRailInitialFocusDone = true },
                     currentScreen = currentScreen,
                     liveMatchesCount = liveMatchesCount,
                     favoritesCount = favorites.size,
                     tvSyncState = tvSyncState,
                     onScreenSelected = { screen ->
                         mainViewModel.setScreen(screen)
+                        moveFocusIntoContentTick++
                     },
                     onOpenTvSyncQr = {
                         mainViewModel.startTvHostMode()
@@ -853,35 +860,55 @@ fun MainAppContent(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxSize()
+                        // Coming back from the rail with → returns to the item last focused in this section.
+                        .tvContentFocusRestorer()
                 ) {
+                    if (currentScreen.isCinema()) {
+                        CinemaSegmentedToggle(
+                            selected = if (currentScreen == AppScreen.SERIES) VodTab.SERIES else VodTab.MOVIES,
+                            onSelect = { tab ->
+                                mainViewModel.setScreen(if (tab == VodTab.SERIES) AppScreen.SERIES else AppScreen.MOVIES)
+                            },
+                            modifier = Modifier
+                                .padding(start = 28.dp, top = 16.dp, end = 28.dp)
+                                .width(260.dp)
+                        )
+                    }
                     renderMainScreenContent(Modifier.weight(1f))
+                    TvRemoteHintBar(
+                        backLabel = when (currentScreen) {
+                            AppScreen.HOME -> "Exit"
+                            AppScreen.PLAYLISTS, AppScreen.PARENTAL_SETTINGS -> "Settings"
+                            else -> "KickOff"
+                        }
+                    )
                 }
             }
         } else {
             // =========================================================================
-            // TOUCH-FIRST LUXURY PHONE & TABLET SHELL (`SetPlayEdition.PHONE`)
+            // PHONE & TABLET SHELL: title bar + content + five tabs
             // =========================================================================
             Scaffold(
                 containerColor = sectionBaseColor,
                 topBar = {
-                    TopStreamingBar(
+                    SectionTopBar(
                         currentScreen = currentScreen,
-                        activePlaylist = activePlaylist,
                         sectionDetailSummary = topSectionDetailText,
-                        liveMatchesCount = liveMatchesCount,
-                        halftimeRemainingSeconds = playerUiState.halftimeTimerRemainingSeconds,
+                        avatarInitial = avatarInitial,
                         isTvSyncActive = tvSyncState.isSyncActive,
+                        halftimeRemainingSeconds = playerUiState.halftimeTimerRemainingSeconds,
                         onReturnToHalftimeMatch = {
                             playerViewModel.returnToHalftimeChannel()
                             isFullScreenPlayer = true
                         },
-                        onDrawerMenuClick = { showNavigationMenuSheet = true },
                         onTvSyncClick = {
                             openTvSyncSheetOnHostTab = false
                             showTvSyncSheet = true
                         },
-                        onCastOrAccountsClick = { mainViewModel.setScreen(AppScreen.PLAYLISTS) },
-                        onSearchClick = { mainViewModel.setScreen(AppScreen.GLOBAL_SEARCH) }
+                        onSettingsClick = { mainViewModel.setScreen(AppScreen.SETTINGS) },
+                        onCinemaTabSelected = { tab ->
+                            mainViewModel.setScreen(if (tab == VodTab.SERIES) AppScreen.SERIES else AppScreen.MOVIES)
+                        }
                     )
                 },
                 bottomBar = {
@@ -913,11 +940,23 @@ fun MainAppContent(
                                 }
                             )
                         }
-                        BottomStreamingNav(
+                        if (playerUiState.currentStream != null && !isFullScreenPlayer) {
+                            PhoneNowPlayingBar(
+                                playerViewModel = playerViewModel,
+                                stream = playerUiState.currentStream!!,
+                                isPlaying = playerUiState.isPlaying,
+                                resolutionLabel = playerUiState.resolutionLabel,
+                                onExpandFullScreen = { isFullScreenPlayer = true },
+                                onTogglePlayPause = { playerViewModel.togglePlayPause() },
+                                onStop = {
+                                    playerViewModel.stopAndClosePlayer()
+                                    isFullScreenPlayer = false
+                                }
+                            )
+                        }
+                        SectionBottomNav(
                             currentScreen = currentScreen,
-                            isStreamPlaying = playerUiState.currentStream != null && playerUiState.isPlaying,
                             liveMatchesCount = liveMatchesCount,
-                            favoritesCount = favorites.size,
                             onScreenSelected = { screen ->
                                 mainViewModel.setScreen(screen)
                             }
@@ -929,96 +968,6 @@ fun MainAppContent(
                     .testTag("main_scaffold")
             ) { innerPadding ->
                 renderMainScreenContent(Modifier.padding(innerPadding))
-            }
-        }
-    }
-
-    // Royal Gold Navigation Drawer Menu Sheet (Accounts, Parental Controls, Edition Switcher)
-    if (showNavigationMenuSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showNavigationMenuSheet = false },
-            containerColor = MetalCharcoal
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column {
-                        Text(
-                            text = "SetPlay Luxury Suite",
-                            color = PaleGold,
-                            fontSize = 19.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            text = activePlaylist?.let { "Active Server: ${it.name}" } ?: "No Xtream account connected",
-                            color = Champagne,
-                            fontSize = 12.sp
-                        )
-                    }
-                    Surface(
-                        color = PaleGold,
-                        shape = RoundedCornerShape(50)
-                    ) {
-                        Text(
-                            text = "VIP SECURE",
-                            color = DarkGraphite,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                DrawerMenuOptionRow(
-                    title = "Xtream Accounts & Servers",
-                    subtitle = "AES-256-GCM encrypted credentials & catalog sync",
-                    icon = Icons.Default.Dns,
-                    onClick = {
-                        showNavigationMenuSheet = false
-                        mainViewModel.setScreen(AppScreen.PLAYLISTS)
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                DrawerMenuOptionRow(
-                    title = "Parental Lock & PIN Controls",
-                    subtitle = "Salted SHA-256 PIN protection & category locks",
-                    icon = Icons.Default.Security,
-                    onClick = {
-                        showNavigationMenuSheet = false
-                        mainViewModel.setScreen(AppScreen.PARENTAL_SETTINGS)
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                DrawerMenuOptionRow(
-                    title = "Wi-Fi Phone ↔ TV QR Companion",
-                    subtitle = if (tvSyncState.isSyncActive) {
-                        "Connected (${tvSyncState.role.name}) • 1-Connection Safe"
-                    } else {
-                        "Pair phone & Android TV over local Wi-Fi via QR or 6-digit PIN"
-                    },
-                    icon = Icons.Default.Tv,
-                    onClick = {
-                        showNavigationMenuSheet = false
-                        openTvSyncSheetOnHostTab = false
-                        showTvSyncSheet = true
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -1177,6 +1126,107 @@ fun MainAppContent(
             },
             containerColor = MetalCharcoal
         )
+    }
+}
+
+/**
+ * Phone "now playing" bar, docked above the tabs while a stream plays and the
+ * player is not full screen. Replaces the draggable floating window: a small
+ * live picture, the channel, pause/play and stop. Tapping the bar returns to
+ * the full-screen player.
+ */
+@OptIn(UnstableApi::class)
+@Composable
+fun PhoneNowPlayingBar(
+    playerViewModel: PlayerViewModel,
+    stream: StreamEntity,
+    isPlaying: Boolean,
+    resolutionLabel: String,
+    onExpandFullScreen: () -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onStop: () -> Unit
+) {
+    Surface(
+        color = MetalCharcoalElevated,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, ChampagneSubtleBorder),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { onExpandFullScreen() }
+            .testTag("mini_player_dock")
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 8.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 72.dp, height = 40.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black)
+            ) {
+                AndroidView(
+                    factory = { ctx ->
+                        PlayerView(ctx).apply {
+                            player = playerViewModel.player
+                            useController = false
+                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                        }
+                    },
+                    update = { playerView -> playerView.player = playerViewModel.player },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stream.name,
+                    color = PaleGold,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = listOf(
+                        if (stream.streamType.equals("live", ignoreCase = true)) "Live" else "Playing",
+                        resolutionLabel
+                    ).filter { it.isNotBlank() }.joinToString(" · "),
+                    color = ChampagneMuted,
+                    fontSize = 11.sp,
+                    maxLines = 1
+                )
+            }
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(AmberGold)
+                    .clickable { onTogglePlayPause() }
+                    .testTag("mini_player_play_pause")
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = DarkGraphite,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            IconButton(
+                onClick = onStop,
+                modifier = Modifier.testTag("mini_player_stop")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Stop",
+                    tint = ChampagneMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
     }
 }
 
@@ -1402,1598 +1452,3 @@ fun FloatingInAppPipWindow(
         }
     }
 }
-
-@Composable
-private fun DrawerMenuOptionRow(
-    title: String,
-    subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit
-) {
-    Surface(
-        color = DarkGraphite,
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, Champagne.copy(alpha = 0.25f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(AmberGold, RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = DarkGraphite, modifier = Modifier.size(20.dp))
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, color = PaleGold, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text(text = subtitle, color = Champagne, fontSize = 11.sp)
-            }
-        }
-    }
-}
-
-@Composable
-fun TopStreamingBar(
-    currentScreen: AppScreen = AppScreen.HOME,
-    activePlaylist: PlaylistEntity?,
-    sectionDetailSummary: String = "",
-    liveMatchesCount: Int = 0,
-    halftimeRemainingSeconds: Int? = null,
-    isTvSyncActive: Boolean = false,
-    onReturnToHalftimeMatch: () -> Unit = {},
-    onDrawerMenuClick: () -> Unit,
-    onTvSyncClick: () -> Unit = {},
-    onCastOrAccountsClick: () -> Unit,
-    onSearchClick: () -> Unit
-) {
-    val (targetSurface, targetPrimary, sectionBadgeTitle) = when (currentScreen) {
-        AppScreen.HOME -> Triple(KickoffPitchBlack, KickoffPitchEmerald, "KICKOFF ARENA")
-        AppScreen.LIVE_TV -> Triple(TvMidnightSlate, TvBroadcastScarlet, "LIVE TV")
-        AppScreen.MOVIES -> Triple(MoviesSapphireNavy, MoviesCyanTeal, "MOVIES")
-        AppScreen.SERIES -> Triple(SeriesPineBase, SeriesMistTeal, "SERIES")
-        AppScreen.FAVORITES -> Triple(FavoritesObsidianBase, FavoritesSagePrimary, "FAVORITES")
-        AppScreen.PLAYLISTS -> Triple(DarkGraphite, AmberGold, "XTREAM SERVERS")
-        AppScreen.GLOBAL_SEARCH -> Triple(DarkGraphite, KickoffPitchEmerald, "GLOBAL SEARCH")
-        AppScreen.PARENTAL_SETTINGS -> Triple(DarkGraphite, AmberGold, "PARENTAL LOCK")
-    }
-
-    val sectionUnderlineStops = when (currentScreen) {
-        AppScreen.HOME -> listOf(KickoffPitchEmerald, KickoffFloodlightVolt, KickoffTrophyGold, KickoffLiveCrimson)
-        AppScreen.LIVE_TV -> listOf(AmberGold, TvBroadcastScarlet, TvCrimsonRose, TvPlumMagenta)
-        AppScreen.MOVIES -> listOf(MoviesMintSpring, MoviesAquamarine, MoviesCyanTeal, MoviesAtlanticTeal)
-        AppScreen.SERIES -> listOf(SeriesIceAqua, SeriesMistTeal, SeriesSeaJade, AmberGold)
-        AppScreen.FAVORITES -> listOf(FavoritesPaleMint, FavoritesSagePrimary, FavoritesBotanicalBorder, AmberGold)
-        else -> listOf(AmberGold, PaleGold, Champagne, AmberGold)
-    }
-
-    val barSurfaceColor by animateColorAsState(targetSurface, tween(300), label = "top_bar_surface")
-    val sectionPrimaryAccent by animateColorAsState(targetPrimary, tween(300), label = "top_bar_primary")
-
-    Surface(
-        color = barSurfaceColor,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            GhostTopBarIconButton(
-                icon = Icons.Default.Menu,
-                contentDescription = "Navigation Drawer Menu",
-                iconTint = Color.White.copy(alpha = 0.92f),
-                accentColor = sectionPrimaryAccent,
-                onClick = onDrawerMenuClick,
-                testTag = "top_drawer_menu_btn"
-            )
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Column(
-                horizontalAlignment = Alignment.Start,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .tvFocusableControl(
-                        accentColor = sectionPrimaryAccent,
-                        shape = RoundedCornerShape(8.dp),
-                        onClick = onCastOrAccountsClick
-                    )
-                    .padding(horizontal = 2.dp, vertical = 1.dp)
-                    .testTag("setplay_creative_wordmark")
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Set",
-                        color = Color.White,
-                        fontSize = 21.sp,
-                        fontWeight = FontWeight.Light,
-                        letterSpacing = 0.5.sp
-                    )
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .padding(horizontal = 2.dp)
-                            .size(18.dp)
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(
-                                        sectionPrimaryAccent.copy(alpha = 0.35f),
-                                        Color.Transparent
-                                    )
-                                ),
-                                shape = CircleShape
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = sectionPrimaryAccent,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                    Text(
-                        text = "Play",
-                        color = AmberGold,
-                        fontSize = 21.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.3.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Box(
-                    modifier = Modifier
-                        .width(96.dp)
-                        .height(2.5.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Brush.horizontalGradient(colors = sectionUnderlineStops))
-                )
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Surface(
-                color = sectionPrimaryAccent.copy(alpha = 0.14f),
-                shape = RoundedCornerShape(50),
-                border = BorderStroke(0.8.dp, sectionPrimaryAccent.copy(alpha = 0.55f))
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(5.5.dp)
-                            .clip(CircleShape)
-                            .background(sectionPrimaryAccent)
-                    )
-                    Spacer(modifier = Modifier.width(5.dp))
-                    Text(
-                        text = sectionBadgeTitle,
-                        color = Color.White,
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.5.sp,
-                        maxLines = 1
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            if (halftimeRemainingSeconds != null && halftimeRemainingSeconds > 0) {
-                val mm = halftimeRemainingSeconds / 60
-                val ss = halftimeRemainingSeconds % 60
-                Surface(
-                    color = AmberGold.copy(alpha = 0.20f),
-                    shape = RoundedCornerShape(50),
-                    border = BorderStroke(1.dp, AmberGold),
-                    modifier = Modifier
-                        .tvFocusableControl(
-                            accentColor = AmberGold,
-                            shape = RoundedCornerShape(50),
-                            onClick = onReturnToHalftimeMatch
-                        )
-                        .testTag("top_bar_halftime_countdown_badge")
-                ) {
-                    Text(
-                        text = String.format(java.util.Locale.US, "⏱️ HT %02d:%02d", mm, ss),
-                        color = AmberGold,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(6.dp))
-            }
-
-            GhostTopBarIconButton(
-                icon = Icons.Default.Tv,
-                contentDescription = "Wi-Fi Phone to TV QR Sync",
-                iconTint = if (isTvSyncActive) ArenaFloodlightLime else Color.White.copy(alpha = 0.88f),
-                accentColor = if (isTvSyncActive) ArenaFloodlightLime else sectionPrimaryAccent,
-                showStatusDot = isTvSyncActive,
-                statusDotColor = ArenaFloodlightLime,
-                onClick = onTvSyncClick,
-                testTag = "top_tv_sync_btn"
-            )
-
-            Spacer(modifier = Modifier.width(6.dp))
-
-            GhostTopBarIconButton(
-                icon = Icons.Default.Dns,
-                contentDescription = "Xtream Accounts & Servers",
-                iconTint = if (activePlaylist != null) AmberGold else Color.White.copy(alpha = 0.88f),
-                accentColor = sectionPrimaryAccent,
-                showStatusDot = activePlaylist != null,
-                statusDotColor = sectionPrimaryAccent,
-                onClick = onCastOrAccountsClick,
-                testTag = "top_playlists_btn"
-            )
-
-            Spacer(modifier = Modifier.width(6.dp))
-
-            GhostTopBarIconButton(
-                icon = Icons.Default.Search,
-                contentDescription = "Search",
-                iconTint = Color.White.copy(alpha = 0.88f),
-                accentColor = sectionPrimaryAccent,
-                onClick = onSearchClick,
-                testTag = "top_search_btn"
-            )
-        }
-    }
-}
-
-@Composable
-private fun GhostTopBarIconButton(
-    icon: ImageVector,
-    contentDescription: String,
-    iconTint: Color,
-    accentColor: Color = KickoffTropicalTeal,
-    showStatusDot: Boolean = false,
-    statusDotColor: Color = AmberGold,
-    onClick: () -> Unit,
-    testTag: String
-) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(38.dp)
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.06f))
-            .border(
-                width = 0.8.dp,
-                brush = Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(alpha = 0.18f),
-                        accentColor.copy(alpha = 0.22f)
-                    )
-                ),
-                shape = CircleShape
-            )
-            .tvFocusableControl(
-                accentColor = accentColor,
-                shape = CircleShape,
-                onClick = onClick
-            )
-            .padding(7.dp)
-            .testTag(testTag)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = iconTint,
-            modifier = Modifier.size(19.dp)
-        )
-        if (showStatusDot) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(6.5.dp)
-                    .clip(CircleShape)
-                    .background(statusDotColor)
-            )
-        }
-    }
-}
-
-private enum class NavKineticStyle {
-    SOCCER_ORBIT,
-    BROADCAST_PULSE,
-    CLAPPER_SNAP,
-    CASCADE_LIFT,
-    STAR_CROWN
-}
-
-private data class LuxuryNavItemSpec(
-    val screen: AppScreen,
-    val label: String,
-    val defaultMicroTag: String,
-    val filledIcon: ImageVector,
-    val outlinedIcon: ImageVector,
-    val crestNeonColor: Color,
-    val crestCoreHighlight: Color,
-    val chamberTint: Color,
-    val activeLabelColor: Color,
-    val kineticStyle: NavKineticStyle
-)
-
-/**
- * SetPlay "Chronograph Orbital & Wave-Crest" Luxury Bottom Navigation Dock:
- * 1. Hydrodynamic Wave-Crest Physics: Dual-spring (`fastSlot` + `slowSlot`) computes real-time
- *    in-flight velocity so the wave crest widens and dips slightly while gliding across tabs,
- *    then surges up to its full sculpted apex upon arrival.
- * 2. 5 Bespoke Luxury Section Chambers:
- *    - Active Section elevates into a 3D Sapphire & Rotating Sweep-Bezel Jewel Medallion with
- *      section-specific kinetic icon choreography (Soccer 360° orbit, Broadcast pulse, Cinema
- *      clapper snap, Series cascade pop, Favorites celestial star burst) and an illuminated
- *      micro-status stage pill underneath ("X LIVE", "ON AIR", "4K CINEMA", "EPISODES", "SAVED").
- *    - Inactive Sections rest inside recessed smoked-glass wells with top specular rims,
- *      automotive instrument divider ticks, and live contextual telemetry micro-badges
- *      (live match counter on KickOff, animated 3-bar equalizer on Live TV, saved counter on Favorites).
- */
-@Composable
-fun BottomStreamingNav(
-    currentScreen: AppScreen,
-    isStreamPlaying: Boolean = false,
-    liveMatchesCount: Int = 0,
-    favoritesCount: Int = 0,
-    onScreenSelected: (AppScreen) -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-
-    val targetDockSurface = when (currentScreen) {
-        AppScreen.HOME -> KickoffPitchBlack
-        AppScreen.LIVE_TV -> Color(0xFF131622)
-        AppScreen.MOVIES -> Color(0xFF061928)
-        AppScreen.SERIES -> Color(0xFF081C1B)
-        AppScreen.FAVORITES -> Color(0xFF061816)
-        else -> MetalCharcoal
-    }
-
-    val navContainerColor by animateColorAsState(
-        targetValue = targetDockSurface,
-        animationSpec = tween(durationMillis = 340),
-        label = "bottom_dock_surface"
-    )
-
-    val navItems = remember {
-        listOf(
-            LuxuryNavItemSpec(
-                screen = AppScreen.HOME,
-                label = "KickOff",
-                defaultMicroTag = "MATCHES",
-                filledIcon = Icons.Filled.SportsSoccer,
-                outlinedIcon = Icons.Outlined.SportsSoccer,
-                crestNeonColor = KickoffPitchEmerald,     // #10B981 Pitch Emerald Brand Identity
-                crestCoreHighlight = KickoffFloodlightVolt, // #D4FF33 Floodlight Volt Kinetic Highlight
-                chamberTint = KickoffStadiumForest,       // #0B3B2D Deep Stadium Turf Forest
-                activeLabelColor = KickoffFloodlightWhite,
-                kineticStyle = NavKineticStyle.SOCCER_ORBIT
-            ),
-            LuxuryNavItemSpec(
-                screen = AppScreen.LIVE_TV,
-                label = "Live TV",
-                defaultMicroTag = "CHANNELS",
-                filledIcon = Icons.Filled.LiveTv,
-                outlinedIcon = Icons.Outlined.LiveTv,
-                crestNeonColor = Color(0xFFFF4D5E),       // Vibrant Broadcast Crimson-Scarlet
-                crestCoreHighlight = AmberGold,           // SetPlay Royal Gold Highlight
-                chamberTint = TvBroadcastScarlet,
-                activeLabelColor = Color.White,
-                kineticStyle = NavKineticStyle.BROADCAST_PULSE
-            ),
-            LuxuryNavItemSpec(
-                screen = AppScreen.MOVIES,
-                label = "Movies",
-                defaultMicroTag = "4K CINEMA",
-                filledIcon = Icons.Filled.Movie,
-                outlinedIcon = Icons.Outlined.Movie,
-                crestNeonColor = Color(0xFF38E4AE),       // Luminous Cinema Mint-Cyan
-                crestCoreHighlight = MoviesMintSpring,
-                chamberTint = MoviesCyanTeal,
-                activeLabelColor = Color.White,
-                kineticStyle = NavKineticStyle.CLAPPER_SNAP
-            ),
-            LuxuryNavItemSpec(
-                screen = AppScreen.SERIES,
-                label = "Series",
-                defaultMicroTag = "EPISODES",
-                filledIcon = Icons.Filled.VideoLibrary,
-                outlinedIcon = Icons.Outlined.VideoLibrary,
-                crestNeonColor = SeriesIceAqua,           // Series Ice-Aqua Neon
-                crestCoreHighlight = PaleGold,
-                chamberTint = SeriesSeaJade,
-                activeLabelColor = Color.White,
-                kineticStyle = NavKineticStyle.CASCADE_LIFT
-            ),
-            LuxuryNavItemSpec(
-                screen = AppScreen.FAVORITES,
-                label = "Favorites",
-                defaultMicroTag = "COLLECTION",
-                filledIcon = Icons.Filled.Star,
-                outlinedIcon = Icons.Outlined.StarOutline,
-                crestNeonColor = FavoritesSagePrimary,    // Botanical Emerald-Sage Neon
-                crestCoreHighlight = AmberGold,
-                chamberTint = FavoritesBotanicalBorder,
-                activeLabelColor = FavoritesPaleMint,
-                kineticStyle = NavKineticStyle.STAR_CROWN
-            )
-        )
-    }
-
-    val rawSelectedIndex = remember(currentScreen, navItems) {
-        navItems.indexOfFirst { it.screen == currentScreen }
-    }
-    val hasActivePrimaryTab = rawSelectedIndex >= 0
-    val selectedIndex = rawSelectedIndex.coerceAtLeast(0)
-    val activeItemSpec = navItems[selectedIndex]
-
-    // Dual-spring hydrodynamic wave physics:
-    // - `fastSlot` leads the wave crest movement
-    // - `slowSlot` trails slightly, allowing us to measure in-flight velocity (`transitStretch`)
-    //   so the wave stretches horizontally and dips slightly in transit before surging up on arrival
-    val fastSlot by animateFloatAsState(
-        targetValue = selectedIndex.toFloat(),
-        animationSpec = spring(
-            dampingRatio = 0.72f,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "wave_crest_fast_slot"
-    )
-    val slowSlot by animateFloatAsState(
-        targetValue = selectedIndex.toFloat(),
-        animationSpec = spring(
-            dampingRatio = 0.84f,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "wave_crest_slow_slot"
-    )
-
-    // Continuous luxury chronograph animations:
-    // 1. `auroraPulse` breathes the spotlight chamber and ambient halo
-    // 2. `orbitalAngle` rotates the 3D sapphire-gold sweep bezel around the active section orb
-    val infiniteTransition = rememberInfiniteTransition(label = "luxury_nav_chronograph")
-    val auroraPulse by infiniteTransition.animateFloat(
-        initialValue = 0.84f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2100),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "aurora_pulse_factor"
-    )
-    val orbitalAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 6800, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "orbital_bezel_angle"
-    )
-
-    val neonPrimary by animateColorAsState(
-        targetValue = activeItemSpec.crestNeonColor,
-        animationSpec = tween(280),
-        label = "crest_neon_primary"
-    )
-    val neonCore by animateColorAsState(
-        targetValue = activeItemSpec.crestCoreHighlight,
-        animationSpec = tween(280),
-        label = "crest_neon_core"
-    )
-    val chamberAccent by animateColorAsState(
-        targetValue = activeItemSpec.chamberTint,
-        animationSpec = tween(280),
-        label = "chamber_accent"
-    )
-
-    val crestHeightDp = 20.dp
-    val dockBodyHeightDp = 56.dp
-    val totalHeightDp = crestHeightDp + dockBodyHeightDp
-    val horizontalInsetDp = 12.dp
-    val density = LocalDensity.current
-
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxWidth()
-            .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-            .height(totalHeightDp)
-            .testTag("bottom_nav")
-    ) {
-        val slotCount = navItems.size
-        val dockWidthPx = with(density) { maxWidth.toPx() }
-        val insetPxForGesture = with(density) { horizontalInsetDp.toPx() }
-
-        // 1. Sculpted Concave-Notch Dock Vessel, Precision Instrument Chambers & Multi-Layer Neon-Gold Rim
-        Canvas(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            val barTopY = 20.dp.toPx()
-            val barBottomY = size.height
-            val barBodyHeightPx = barBottomY - barTopY
-
-            val insetPx = horizontalInsetDp.toPx()
-            val usableWidthPx = (size.width - insetPx * 2f).coerceAtLeast(1f)
-            val slotWidthPx = if (slotCount > 0) usableWidthPx / slotCount else usableWidthPx
-
-            // Dual-spring horizontal glide state
-            val transitStretch = abs(fastSlot - slowSlot).coerceIn(0f, 1.2f)
-            val effectiveSlot = fastSlot * 0.74f + slowSlot * 0.26f
-
-            // Concave U-shaped cutout cradle (~68.dp wide, ~24.dp deep into the bar body)
-            // so the 46.dp floating circular medallion sits nestled inside with a 4.dp air gap
-            val crestCenterX = insetPx + (effectiveSlot + 0.5f) * slotWidthPx
-            val baseHalfWidth = 34.dp.toPx() // 68.dp total concave cutout width
-            val crestHalfWidth = baseHalfWidth * (1f + transitStretch * 0.14f)
-
-            val notchDepthPx = if (hasActivePrimaryTab) {
-                24.dp.toPx() - (transitStretch * 3.dp.toPx()).coerceAtMost(4.dp.toPx())
-            } else {
-                0f
-            }
-            val notchBottomY = barTopY + notchDepthPx
-
-            val crestStartX = crestCenterX - crestHalfWidth
-            val crestEndX = crestCenterX + crestHalfWidth
-
-            // Adaptive 26.dp stadium corner radii
-            val cornerRadiusPx = 26.dp.toPx()
-            val bottomCornerR = minOf(cornerRadiusPx, barBodyHeightPx * 0.48f)
-            val leftTopCornerR = minOf(cornerRadiusPx, (crestStartX - 1.dp.toPx()).coerceAtLeast(10.dp.toPx()))
-            val rightTopCornerR = minOf(cornerRadiusPx, (size.width - crestEndX - 1.dp.toPx()).coerceAtLeast(10.dp.toPx()))
-
-            val safeCrestStartX = crestStartX.coerceAtLeast(leftTopCornerR)
-            val safeCrestEndX = crestEndX.coerceAtMost(size.width - rightTopCornerR)
-
-            val dockPath = Path().apply {
-                moveTo(leftTopCornerR, barTopY)
-
-                if (safeCrestStartX > leftTopCornerR) {
-                    lineTo(safeCrestStartX, barTopY)
-                }
-
-                // Left descending cubic-bezier curve carving smoothly down into the concave U-notch cradle
-                cubicTo(
-                    x1 = safeCrestStartX + (crestCenterX - safeCrestStartX) * 0.42f,
-                    y1 = barTopY,
-                    x2 = crestCenterX - (crestCenterX - safeCrestStartX) * 0.44f,
-                    y2 = notchBottomY,
-                    x3 = crestCenterX,
-                    y3 = notchBottomY
-                )
-
-                // Right ascending cubic-bezier curve rising smoothly back to barTopY
-                cubicTo(
-                    x1 = crestCenterX + (safeCrestEndX - crestCenterX) * 0.44f,
-                    y1 = notchBottomY,
-                    x2 = safeCrestEndX - (safeCrestEndX - crestCenterX) * 0.42f,
-                    y2 = barTopY,
-                    x3 = safeCrestEndX,
-                    y3 = barTopY
-                )
-
-                if (safeCrestEndX < size.width - rightTopCornerR) {
-                    lineTo(size.width - rightTopCornerR, barTopY)
-                }
-
-                arcTo(
-                    rect = Rect(
-                        left = size.width - 2f * rightTopCornerR,
-                        top = barTopY,
-                        right = size.width,
-                        bottom = barTopY + 2f * rightTopCornerR
-                    ),
-                    startAngleDegrees = -90f,
-                    sweepAngleDegrees = 90f,
-                    forceMoveTo = false
-                )
-
-                lineTo(size.width, barBottomY - bottomCornerR)
-
-                arcTo(
-                    rect = Rect(
-                        left = size.width - 2f * bottomCornerR,
-                        top = barBottomY - 2f * bottomCornerR,
-                        right = size.width,
-                        bottom = barBottomY
-                    ),
-                    startAngleDegrees = 0f,
-                    sweepAngleDegrees = 90f,
-                    forceMoveTo = false
-                )
-
-                lineTo(bottomCornerR, barBottomY)
-
-                arcTo(
-                    rect = Rect(
-                        left = 0f,
-                        top = barBottomY - 2f * bottomCornerR,
-                        right = 2f * bottomCornerR,
-                        bottom = barBottomY
-                    ),
-                    startAngleDegrees = 90f,
-                    sweepAngleDegrees = 90f,
-                    forceMoveTo = false
-                )
-
-                lineTo(0f, barTopY + leftTopCornerR)
-
-                arcTo(
-                    rect = Rect(
-                        left = 0f,
-                        top = barTopY,
-                        right = 2f * leftTopCornerR,
-                        bottom = barTopY + 2f * leftTopCornerR
-                    ),
-                    startAngleDegrees = 180f,
-                    sweepAngleDegrees = 90f,
-                    forceMoveTo = false
-                )
-
-                close()
-            }
-
-            // A. Breathing Ambient Halo behind the concave cutout cradle
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        neonPrimary.copy(alpha = 0.34f * auroraPulse),
-                        neonCore.copy(alpha = 0.14f * auroraPulse),
-                        Color.Transparent
-                    ),
-                    center = Offset(crestCenterX, barTopY + 2.dp.toPx()),
-                    radius = crestHalfWidth * 1.25f
-                ),
-                radius = crestHalfWidth * 1.25f,
-                center = Offset(crestCenterX, barTopY + 2.dp.toPx())
-            )
-
-            // B. Deep Obsidian-Glass Base Fill with subtle vertical depth gradient
-            drawPath(
-                path = dockPath,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        navContainerColor.copy(alpha = 0.97f),
-                        Color(0xFF060C14).copy(alpha = 0.99f),
-                        Color(0xFF03060A)
-                    ),
-                    startY = barTopY,
-                    endY = barBottomY
-                )
-            )
-
-            // C. Clipped Interior Lighting: Instrument Dividers, Spotlight Chamber & Laser Horizon
-            clipPath(dockPath) {
-                val chamberHalfWidth = slotWidthPx * 0.49f
-                val chamberLeft = crestCenterX - chamberHalfWidth
-                val chamberRight = crestCenterX + chamberHalfWidth
-
-                // 1. Subtle Top Specular Glass Reflection across inactive bar shoulders
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.065f),
-                            Color.Transparent
-                        ),
-                        startY = barTopY,
-                        endY = barTopY + 18.dp.toPx()
-                    ),
-                    topLeft = Offset(0f, barTopY),
-                    size = androidx.compose.ui.geometry.Size(size.width, 18.dp.toPx())
-                )
-
-                // 2. Luxury Instrument Cluster Divider Hairlines between inactive slots
-                for (dividerIndex in 1 until slotCount) {
-                    val dividerX = insetPx + dividerIndex * slotWidthPx
-                    val distFromCrest = abs(dividerX - crestCenterX) / slotWidthPx
-                    val dividerAlpha = ((distFromCrest - 0.55f) / 0.65f).coerceIn(0f, 1f) * 0.085f
-                    if (dividerAlpha > 0.005f) {
-                        drawLine(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.White.copy(alpha = dividerAlpha),
-                                    Champagne.copy(alpha = dividerAlpha * 0.6f),
-                                    Color.Transparent
-                                ),
-                                startY = barTopY + 8.dp.toPx(),
-                                endY = barBottomY - 8.dp.toPx()
-                            ),
-                            start = Offset(dividerX, barTopY + 8.dp.toPx()),
-                            end = Offset(dividerX, barBottomY - 8.dp.toPx()),
-                            strokeWidth = 0.8.dp.toPx()
-                        )
-                    }
-                }
-
-                // 3. Sculpted Spotlight Chamber Column below the concave cradle
-                drawRoundRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            neonPrimary.copy(alpha = 0.28f * auroraPulse),
-                            chamberAccent.copy(alpha = 0.18f * auroraPulse),
-                            chamberAccent.copy(alpha = 0.05f)
-                        ),
-                        startY = barTopY,
-                        endY = barBottomY
-                    ),
-                    topLeft = Offset(chamberLeft, barTopY),
-                    size = androidx.compose.ui.geometry.Size(chamberHalfWidth * 2f, barBottomY - barTopY),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(18.dp.toPx(), 18.dp.toPx())
-                )
-
-                // 4. Concentrated Radial Spotlight Bloom hugging the concave cradle rim
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            neonCore.copy(alpha = 0.36f * auroraPulse),
-                            neonPrimary.copy(alpha = 0.24f * auroraPulse),
-                            Color.Transparent
-                        ),
-                        center = Offset(crestCenterX, notchBottomY),
-                        radius = crestHalfWidth * 0.95f
-                    ),
-                    radius = crestHalfWidth * 0.95f,
-                    center = Offset(crestCenterX, notchBottomY)
-                )
-
-                // 5. SetPlay Signature Gold-to-Neon Laser Pedestal Bar at the base of the active section
-                val floorBarWidth = 26.dp.toPx()
-                val floorBarHeight = 2.2.dp.toPx()
-                val floorBarLeft = crestCenterX - floorBarWidth / 2f
-                drawRoundRect(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            AmberGold.copy(alpha = 0.92f),
-                            neonCore,
-                            neonPrimary,
-                            AmberGold.copy(alpha = 0.92f),
-                            Color.Transparent
-                        ),
-                        startX = floorBarLeft - 4.dp.toPx(),
-                        endX = floorBarLeft + floorBarWidth + 4.dp.toPx()
-                    ),
-                    topLeft = Offset(floorBarLeft, barBottomY - 2.6.dp.toPx()),
-                    size = androidx.compose.ui.geometry.Size(floorBarWidth, floorBarHeight),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(floorBarHeight, floorBarHeight)
-                )
-            }
-
-            // D. Multi-Layered Neon Rim Stroke along the Concave-Cutout & Stadium Contour
-            drawPath(
-                path = dockPath,
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        neonPrimary.copy(alpha = 0.38f * auroraPulse),
-                        neonPrimary.copy(alpha = 0.14f * auroraPulse),
-                        neonPrimary.copy(alpha = 0.04f)
-                    ),
-                    center = Offset(crestCenterX, notchBottomY),
-                    radius = size.width * 0.56f
-                ),
-                style = Stroke(
-                    width = 4.5.dp.toPx(),
-                    cap = StrokeCap.Round,
-                    join = StrokeJoin.Round
-                )
-            )
-
-            drawPath(
-                path = dockPath,
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        neonCore,
-                        neonPrimary,
-                        neonPrimary.copy(alpha = 0.75f),
-                        neonPrimary.copy(alpha = 0.35f)
-                    ),
-                    center = Offset(crestCenterX, notchBottomY),
-                    radius = size.width * 0.86f
-                ),
-                style = Stroke(
-                    width = 1.6.dp.toPx(),
-                    cap = StrokeCap.Round,
-                    join = StrokeJoin.Round
-                )
-            )
-
-            // Inner 3D Specular Crystal Cradle Arc along the concave notch contour
-            val cradleArcPath = Path().apply {
-                moveTo(safeCrestStartX + 3.dp.toPx(), barTopY + 1.2.dp.toPx())
-                cubicTo(
-                    x1 = safeCrestStartX + (crestCenterX - safeCrestStartX) * 0.42f,
-                    y1 = barTopY + 1.2.dp.toPx(),
-                    x2 = crestCenterX - (crestCenterX - safeCrestStartX) * 0.44f,
-                    y2 = notchBottomY + 1.2.dp.toPx(),
-                    x3 = crestCenterX,
-                    y3 = notchBottomY + 1.2.dp.toPx()
-                )
-                cubicTo(
-                    x1 = crestCenterX + (safeCrestEndX - crestCenterX) * 0.44f,
-                    y1 = notchBottomY + 1.2.dp.toPx(),
-                    x2 = safeCrestEndX - (safeCrestEndX - crestCenterX) * 0.42f,
-                    y2 = barTopY + 1.2.dp.toPx(),
-                    x3 = safeCrestEndX - 3.dp.toPx(),
-                    y3 = barTopY + 1.2.dp.toPx()
-                )
-            }
-            drawPath(
-                path = cradleArcPath,
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        neonCore.copy(alpha = 0.80f),
-                        Color.White.copy(alpha = 0.95f),
-                        neonCore.copy(alpha = 0.80f),
-                        Color.Transparent
-                    ),
-                    startX = safeCrestStartX,
-                    endX = safeCrestEndX
-                ),
-                style = Stroke(
-                    width = 1.1.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
-            )
-        }
-
-        // 2. Interactive 5-Section Concierge Row: Supports Both Tap & Horizontal Scrubbing Gesture
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = horizontalInsetDp)
-                .pointerInput(navItems, currentScreen, dockWidthPx) {
-                    detectHorizontalDragGestures { change, _ ->
-                        change.consume()
-                        val usableW = (dockWidthPx - insetPxForGesture * 2f).coerceAtLeast(1f)
-                        val relX = change.position.x.coerceIn(0f, usableW - 1f)
-                        val targetIdx = ((relX / usableW) * navItems.size).toInt().coerceIn(0, navItems.lastIndex)
-                        val targetScreen = navItems[targetIdx].screen
-                        if (targetScreen != currentScreen) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onScreenSelected(targetScreen)
-                        }
-                    }
-                },
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            navItems.forEach { item ->
-                val isSelected = currentScreen == item.screen
-
-                // Dynamic live badge text for inactive smoked-glass wells
-                val inactiveBadgeCountText = when (item.screen) {
-                    AppScreen.HOME -> if (liveMatchesCount > 0) liveMatchesCount.coerceAtMost(99).toString() else null
-                    AppScreen.FAVORITES -> if (favoritesCount > 0) favoritesCount.coerceAtMost(99).toString() else null
-                    else -> null
-                }
-
-                LuxuryBottomNavSectionSlot(
-                    item = item,
-                    isSelected = isSelected,
-                    inactiveBadgeText = inactiveBadgeCountText,
-                    showLiveEqualizer = item.screen == AppScreen.LIVE_TV && isStreamPlaying,
-                    hasLivePulseDot = (item.screen == AppScreen.HOME && liveMatchesCount > 0) ||
-                        (item.screen == AppScreen.LIVE_TV && isStreamPlaying),
-                    orbitalAngle = orbitalAngle,
-                    auroraPulse = auroraPulse,
-                    onSelect = {
-                        if (currentScreen != item.screen) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        }
-                        onScreenSelected(item.screen)
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(totalHeightDp)
-                        .testTag("nav_item_${item.screen.name.lowercase()}")
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun LuxuryBottomNavSectionSlot(
-    item: LuxuryNavItemSpec,
-    isSelected: Boolean,
-    inactiveBadgeText: String?,
-    showLiveEqualizer: Boolean,
-    hasLivePulseDot: Boolean,
-    orbitalAngle: Float,
-    auroraPulse: Float,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    // Active 46.dp medallion sits nestled inside the concave cutout cradle (4.dp air gap above notchBottomY);
-    // inactive icon well sits cleanly inside the dock body above the baseline label.
-    val medallionOffsetY by animateDpAsState(
-        targetValue = if (isSelected) (-13).dp else 0.dp,
-        animationSpec = spring(
-            dampingRatio = 0.66f,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "medallion_offset_${item.label}"
-    )
-
-    val medallionSizeDp by animateDpAsState(
-        targetValue = if (isSelected) 46.dp else 34.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "medallion_size_${item.label}"
-    )
-
-    val activeProgress by animateFloatAsState(
-        targetValue = if (isSelected) 1f else 0f,
-        animationSpec = tween(durationMillis = 240),
-        label = "active_progress_${item.label}"
-    )
-
-    // Section-specific kinetic choreography when selected
-    val targetKineticRotation = remember(isSelected, item.kineticStyle) {
-        if (!isSelected) {
-            0f
-        } else {
-            when (item.kineticStyle) {
-                NavKineticStyle.SOCCER_ORBIT -> 360f
-                NavKineticStyle.STAR_CROWN -> 72f
-                NavKineticStyle.CLAPPER_SNAP -> -12f
-                NavKineticStyle.BROADCAST_PULSE -> 0f
-                NavKineticStyle.CASCADE_LIFT -> 0f
-            }
-        }
-    }
-
-    val kineticRotationZ by animateFloatAsState(
-        targetValue = targetKineticRotation,
-        animationSpec = spring(
-            dampingRatio = 0.62f,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "kinetic_rot_${item.label}"
-    )
-
-    val iconDisplayRotation = when (item.kineticStyle) {
-        NavKineticStyle.CLAPPER_SNAP -> kineticRotationZ * (1f - activeProgress * 0.65f)
-        else -> kineticRotationZ
-    }
-
-    var isTvFocused by remember { mutableStateOf(false) }
-
-    val labelColor by animateColorAsState(
-        targetValue = when {
-            isTvFocused -> AmberGold
-            isSelected -> item.activeLabelColor
-            else -> Champagne.copy(alpha = 0.68f)
-        },
-        animationSpec = tween(220),
-        label = "label_color_${item.label}"
-    )
-
-    Box(
-        contentAlignment = Alignment.BottomCenter,
-        modifier = modifier
-            .onFocusChanged { focusState ->
-                isTvFocused = focusState.isFocused
-            }
-            .then(
-                if (isTvFocused) {
-                    Modifier.border(
-                        width = 2.dp,
-                        brush = Brush.linearGradient(
-                            colors = listOf(item.crestNeonColor, AmberGold, item.crestNeonColor)
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                } else {
-                    Modifier
-                }
-            )
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onSelect
-            )
-            .padding(bottom = 5.dp)
-    ) {
-        // 1. Floating Circular Active Medallion (46.dp in Concave Cutout) or Inactive Smoked-Glass Well
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp)
-                .offset(y = medallionOffsetY)
-                .size(medallionSizeDp)
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val center = Offset(size.width / 2f, size.height / 2f)
-                val maxRadius = size.minDimension / 2f
-
-                if (activeProgress > 0.01f) {
-                    // A. Outer Ambient Jewel Bloom inside the 4.dp concave air gap
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                item.crestNeonColor.copy(alpha = 0.50f * activeProgress * auroraPulse),
-                                item.crestCoreHighlight.copy(alpha = 0.20f * activeProgress),
-                                Color.Transparent
-                            ),
-                            center = center,
-                            radius = maxRadius * 1.12f
-                        ),
-                        radius = maxRadius * 1.12f,
-                        center = center
-                    )
-
-                    // B. Deep Sapphire-Obsidian Jewel Core Sphere (46.dp diameter)
-                    val orbRadius = maxRadius * 0.96f
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                item.chamberTint.copy(alpha = 0.95f * activeProgress),
-                                Color(0xFF07131E).copy(alpha = 0.98f * activeProgress),
-                                Color(0xFF040910).copy(alpha = activeProgress)
-                            ),
-                            center = Offset(center.x - orbRadius * 0.25f, center.y - orbRadius * 0.28f),
-                            radius = orbRadius * 1.35f
-                        ),
-                        radius = orbRadius,
-                        center = center
-                    )
-
-                    // C. Rotating Chronograph Sweep-Gradient Bezel Ring
-                    rotate(degrees = orbitalAngle, pivot = center) {
-                        drawCircle(
-                            brush = Brush.sweepGradient(
-                                colors = listOf(
-                                    item.crestNeonColor.copy(alpha = 0.95f * activeProgress),
-                                    item.crestCoreHighlight.copy(alpha = 0.98f * activeProgress),
-                                    Color.White.copy(alpha = 0.92f * activeProgress),
-                                    item.crestNeonColor.copy(alpha = 0.30f * activeProgress),
-                                    AmberGold.copy(alpha = 0.88f * activeProgress),
-                                    item.crestNeonColor.copy(alpha = 0.95f * activeProgress)
-                                ),
-                                center = center
-                            ),
-                            radius = orbRadius,
-                            center = center,
-                            style = Stroke(width = 1.6.dp.toPx())
-                        )
-                    }
-
-                    // D. Top-Left Sapphire Crystal Specular Crescent Highlight
-                    drawArc(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.58f * activeProgress),
-                                item.crestCoreHighlight.copy(alpha = 0.22f * activeProgress),
-                                Color.Transparent
-                            ),
-                            start = Offset(center.x - orbRadius, center.y - orbRadius),
-                            end = Offset(center.x + orbRadius * 0.3f, center.y + orbRadius * 0.3f)
-                        ),
-                        startAngle = 195f,
-                        sweepAngle = 120f,
-                        useCenter = false,
-                        topLeft = Offset(center.x - orbRadius * 0.78f, center.y - orbRadius * 0.78f),
-                        size = androidx.compose.ui.geometry.Size(orbRadius * 1.56f, orbRadius * 1.56f),
-                        style = Stroke(width = 1.1.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                }
-
-                if (activeProgress < 0.99f) {
-                    // Recessed Smoked-Glass Capsule Well for Inactive Sections
-                    val inactiveAlpha = 1f - activeProgress
-                    val wellRadius = maxRadius * 0.88f
-                    drawCircle(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.045f * inactiveAlpha),
-                                Color(0xFF050B12).copy(alpha = 0.55f * inactiveAlpha)
-                            ),
-                            startY = center.y - wellRadius,
-                            endY = center.y + wellRadius
-                        ),
-                        radius = wellRadius,
-                        center = center
-                    )
-                    drawCircle(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.14f * inactiveAlpha),
-                                item.crestNeonColor.copy(alpha = 0.08f * inactiveAlpha),
-                                Color.Transparent
-                            ),
-                            startY = center.y - wellRadius,
-                            endY = center.y + wellRadius
-                        ),
-                        radius = wellRadius,
-                        center = center,
-                        style = Stroke(width = 0.85.dp.toPx())
-                    )
-                }
-            }
-
-            // Dual-Layer Holographic Icon with Kinetic Choreography
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.graphicsLayer {
-                    rotationZ = iconDisplayRotation
-                }
-            ) {
-                if (isSelected) {
-                    Icon(
-                        imageVector = item.filledIcon,
-                        contentDescription = null,
-                        tint = item.crestCoreHighlight.copy(alpha = 0.32f),
-                        modifier = Modifier.size(23.dp)
-                    )
-                    Icon(
-                        imageVector = item.outlinedIcon,
-                        contentDescription = item.label,
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                } else {
-                    Icon(
-                        imageVector = item.outlinedIcon,
-                        contentDescription = item.label,
-                        tint = Champagne.copy(alpha = 0.68f),
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
-            }
-
-            // Live Contextual Telemetry Badges on Medallion / Smoked-Glass Wells
-            if (showLiveEqualizer) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = 3.dp, y = (-1).dp)
-                ) {
-                    LiveEqualizerMiniBadge(
-                        accentColor = LiveRed,
-                        auroraPulse = auroraPulse
-                    )
-                }
-            } else if (inactiveBadgeText != null) {
-                val isLiveMatchBadge = item.screen == AppScreen.HOME && hasLivePulseDot
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = 5.dp, y = (-1).dp)
-                        .background(
-                            color = if (isLiveMatchBadge) KickoffLiveCrimson else KickoffTurfSurface.copy(alpha = 0.96f),
-                            shape = RoundedCornerShape(50)
-                        )
-                        .border(
-                            width = 0.85.dp,
-                            color = if (isLiveMatchBadge) KickoffFloodlightWhite.copy(alpha = 0.85f) else item.crestNeonColor.copy(alpha = 0.78f),
-                            shape = RoundedCornerShape(50)
-                        )
-                        .padding(horizontal = 4.5.dp, vertical = 1.dp)
-                ) {
-                    Text(
-                        text = inactiveBadgeText,
-                        color = if (isLiveMatchBadge) KickoffFloodlightWhite else item.crestCoreHighlight,
-                        fontSize = 7.5.sp,
-                        lineHeight = 8.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.15.sp,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-
-        // 2. Crisp Single-Line Section Label aligned cleanly along the bottom baseline
-        Text(
-            text = item.label,
-            color = labelColor,
-            fontSize = if (isSelected) 11.sp else 9.8.sp,
-            lineHeight = 12.sp,
-            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
-            letterSpacing = if (isSelected) 0.35.sp else 0.15.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 2.dp)
-        )
-    }
-}
-
-/**
- * Miniature 3-bar animated broadcast equalizer badge shown on the Live TV section
- * when a stream is actively playing while browsing another section.
- */
-@Composable
-private fun LiveEqualizerMiniBadge(
-    accentColor: Color,
-    auroraPulse: Float
-) {
-    Row(
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(1.2.dp),
-        modifier = Modifier
-            .background(
-                color = Color(0xFF0A1018).copy(alpha = 0.94f),
-                shape = RoundedCornerShape(5.dp)
-            )
-            .border(
-                width = 0.7.dp,
-                color = accentColor.copy(alpha = 0.75f),
-                shape = RoundedCornerShape(5.dp)
-            )
-            .padding(horizontal = 3.dp, vertical = 2.dp)
-            .height(8.dp)
-    ) {
-        val bar1Fraction = (0.45f + (auroraPulse - 0.84f) * 3.2f).coerceIn(0.35f, 1f)
-        val bar2Fraction = (1f - (auroraPulse - 0.84f) * 2.8f).coerceIn(0.40f, 1f)
-        val bar3Fraction = (0.60f + (auroraPulse - 0.84f) * 2.4f).coerceIn(0.35f, 1f)
-
-        listOf(bar1Fraction, bar2Fraction, bar3Fraction).forEach { fraction ->
-            Box(
-                modifier = Modifier
-                    .width(1.6.dp)
-                    .height((7.dp * fraction).coerceAtLeast(2.5.dp))
-                    .background(
-                        color = accentColor,
-                        shape = RoundedCornerShape(1.dp)
-                    )
-            )
-        }
-    }
-}
-
-private data class TvRailNavEntry(
-    val label: String,
-    val icon: ImageVector,
-    val testTag: String,
-    val targetScreen: AppScreen? = null,
-    val badgeText: String? = null,
-    val accentColor: Color = AmberGold,
-    val customAction: (() -> Unit)? = null
-)
-
-/**
- * Dedicated 10-Foot Widescreen Android TV Left Navigation Rail (`testTag("tv_left_navigation_rail")`):
- * - Sleek vertical glass rail (`width = 216.dp`, `Color(0xF2081018)`) with D-Pad focus rings (`Modifier.tvFocusableControl`).
- * - Top Brand Header (`Set ▶ Play` + `"TV EDITION"` gold badge + active live matches badge).
- * - Preserves all `nav_*` (`nav_home`, `nav_live_tv`, `nav_movies`, `nav_series`, `nav_favorites`) and
- *   `top_*` (`top_search_btn`, `top_tv_sync_btn`, `top_playlists_btn`) test tags.
- * - Bottom Live Sync Telemetry Pod (`testTag("tv_rail_sync_status_pod")`) displaying real-time Phone Sync
- *   status or the 6-digit Pairing PIN + LAN IP at a glance.
- */
-@Composable
-fun TvLeftNavigationRail(
-    currentScreen: AppScreen,
-    liveMatchesCount: Int,
-    favoritesCount: Int,
-    tvSyncState: com.example.data.sync.TvSyncSessionState,
-    onScreenSelected: (AppScreen) -> Unit,
-    onOpenTvSyncQr: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val entries = remember(liveMatchesCount, favoritesCount) {
-        listOf(
-            TvRailNavEntry(
-                label = "⚽ KickOff Arena",
-                icon = Icons.Default.SportsSoccer,
-                testTag = "nav_home",
-                targetScreen = AppScreen.HOME,
-                badgeText = if (liveMatchesCount > 0) "$liveMatchesCount LIVE" else null,
-                accentColor = KickoffPitchEmerald
-            ),
-            TvRailNavEntry(
-                label = "📺 Live TV",
-                icon = Icons.Default.LiveTv,
-                testTag = "nav_live_tv",
-                targetScreen = AppScreen.LIVE_TV,
-                accentColor = TvBroadcastScarlet
-            ),
-            TvRailNavEntry(
-                label = "🎬 Movies",
-                icon = Icons.Default.Movie,
-                testTag = "nav_movies",
-                targetScreen = AppScreen.MOVIES,
-                accentColor = MoviesCyanTeal
-            ),
-            TvRailNavEntry(
-                label = "🎞️ Series",
-                icon = Icons.Default.VideoLibrary,
-                testTag = "nav_series",
-                targetScreen = AppScreen.SERIES,
-                accentColor = SeriesEmerald
-            ),
-            TvRailNavEntry(
-                label = "⭐ Favorites",
-                icon = Icons.Default.Star,
-                testTag = "nav_favorites",
-                targetScreen = AppScreen.FAVORITES,
-                badgeText = if (favoritesCount > 0) favoritesCount.toString() else null,
-                accentColor = FavoritesSagePrimary
-            ),
-            TvRailNavEntry(
-                label = "🔍 Global Search",
-                icon = Icons.Default.Search,
-                testTag = "top_search_btn",
-                targetScreen = AppScreen.GLOBAL_SEARCH,
-                accentColor = AmberGold
-            ),
-            TvRailNavEntry(
-                label = "📲 Phone Sync QR",
-                icon = Icons.Default.Tv,
-                testTag = "top_tv_sync_btn",
-                accentColor = ArenaFloodlightLime,
-                customAction = onOpenTvSyncQr
-            ),
-            TvRailNavEntry(
-                label = "🖧 Xtream Servers",
-                icon = Icons.Default.Dns,
-                testTag = "top_playlists_btn",
-                targetScreen = AppScreen.PLAYLISTS,
-                accentColor = PaleGold
-            ),
-            TvRailNavEntry(
-                label = "🔒 Parental Lock",
-                icon = Icons.Default.Security,
-                testTag = "tv_rail_parental_lock_btn",
-                targetScreen = AppScreen.PARENTAL_SETTINGS,
-                accentColor = LiveCrimson
-            )
-        )
-    }
-
-    val isPhonePaired = tvSyncState.connectedPeerName.isNotBlank()
-    val pinDisplay = tvSyncState.pairingPin.ifBlank { "READY" }
-    val ipDisplay = tvSyncState.localIpAddress.ifBlank { "LAN Wi-Fi" }
-    val activeRailItemFocusRequester = remember { FocusRequester() }
-    val hasMatchingTarget = entries.any { it.targetScreen != null && it.targetScreen == currentScreen }
-
-    LaunchedEffect(currentScreen) {
-        runCatching { activeRailItemFocusRequester.requestFocus() }
-    }
-
-    Row(modifier = modifier.fillMaxHeight()) {
-        Column(
-            modifier = Modifier
-                .width(216.dp)
-                .fillMaxHeight()
-                .background(Color(0xF2081018))
-                .padding(horizontal = 12.dp, vertical = 14.dp)
-                .testTag("tv_left_navigation_rail"),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // 1. Top Brand Header + TV EDITION Badge
-            Column {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(RoundedCornerShape(9.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(AmberGold, PaleGold)
-                                    )
-                                )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "SetPlay TV",
-                                tint = DarkGraphite,
-                                modifier = Modifier.size(19.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "Set ▶ Play",
-                                color = Color.White,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                            Text(
-                                text = "10-FOOT CINEMA & ARENA",
-                                color = Champagne,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Surface(
-                        color = AmberGold.copy(alpha = 0.20f),
-                        shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(0.8.dp, AmberGold)
-                    ) {
-                        Text(
-                            text = "TV EDITION",
-                            color = PaleGold,
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            // 2. Scrollable 10-Foot Navigation Items
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                entries.forEachIndexed { index, entry ->
-                    val isSelected = entry.targetScreen != null && entry.targetScreen == currentScreen
-                    val isInitialFocusTarget = isSelected || (!hasMatchingTarget && index == 0)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isSelected) {
-                                    entry.accentColor.copy(alpha = 0.20f)
-                                } else {
-                                    Color.White.copy(alpha = 0.03f)
-                                }
-                            )
-                            .border(
-                                width = if (isSelected) 1.4.dp else 0.7.dp,
-                                color = if (isSelected) entry.accentColor else Color.White.copy(alpha = 0.07f),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .then(
-                                if (isInitialFocusTarget) {
-                                    Modifier.focusRequester(activeRailItemFocusRequester)
-                                } else {
-                                    Modifier
-                                }
-                            )
-                            .tvFocusableControl(
-                                accentColor = AmberGold,
-                                shape = RoundedCornerShape(12.dp),
-                                onClick = {
-                                    if (entry.customAction != null) {
-                                        entry.customAction.invoke()
-                                    } else if (entry.targetScreen != null) {
-                                        onScreenSelected(entry.targetScreen)
-                                    }
-                                }
-                            )
-                            .padding(horizontal = 10.dp, vertical = 8.dp)
-                            .testTag(entry.testTag)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = entry.icon,
-                                contentDescription = entry.label,
-                                tint = if (isSelected) entry.accentColor else Champagne,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(9.dp))
-                            Text(
-                                text = entry.label,
-                                color = if (isSelected) Color.White else Champagne,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        if (!entry.badgeText.isNullOrBlank()) {
-                            Surface(
-                                color = entry.accentColor.copy(alpha = 0.24f),
-                                shape = RoundedCornerShape(50),
-                                border = BorderStroke(0.7.dp, entry.accentColor)
-                            ) {
-                                Text(
-                                    text = entry.badgeText,
-                                    color = Color.White,
-                                    fontSize = 8.5.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 3. Bottom Live Sync Telemetry Pod (`tv_rail_sync_status_pod`)
-            Surface(
-                color = Color(0xFF0E1B28),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = if (isPhonePaired) ArenaFloodlightLime else AmberGold.copy(alpha = 0.55f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .tvFocusableControl(
-                        accentColor = AmberGold,
-                        shape = RoundedCornerShape(14.dp),
-                        onClick = onOpenTvSyncQr
-                    )
-                    .testTag("tv_rail_sync_status_pod")
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = if (isPhonePaired) {
-                            "🟢 Phone Connected"
-                        } else {
-                            "📲 Wi-Fi Sync Ready • PIN: $pinDisplay"
-                        },
-                        color = if (isPhonePaired) ArenaFloodlightLime else PaleGold,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = if (isPhonePaired) {
-                            tvSyncState.connectedPeerName
-                        } else {
-                            "IP: $ipDisplay:${tvSyncState.serverPort}"
-                        },
-                        color = Champagne,
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-
-        // Right 1.dp Gold Divider Border
-        Box(
-            modifier = Modifier
-                .width(1.dp)
-                .fillMaxHeight()
-                .background(AmberGold.copy(alpha = 0.28f))
-        )
-    }
-}
-
-
-

@@ -116,7 +116,7 @@ fun PlaylistsScreen(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Xtream Accounts",
+                    text = "Accounts & servers",
                     color = TextPrimary,
                     fontSize = 21.sp,
                     fontWeight = FontWeight.ExtraBold

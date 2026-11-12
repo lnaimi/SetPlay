@@ -61,7 +61,8 @@ enum class AppScreen {
     FAVORITES,
     GLOBAL_SEARCH,
     PLAYLISTS,
-    PARENTAL_SETTINGS
+    PARENTAL_SETTINGS,
+    SETTINGS
 }
 
 sealed class ConnectionTestState {

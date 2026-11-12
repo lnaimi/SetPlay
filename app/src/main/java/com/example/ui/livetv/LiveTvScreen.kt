@@ -18,12 +18,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -51,6 +54,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -63,6 +68,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,6 +93,8 @@ import com.example.ui.theme.CatchupGreen
 import com.example.ui.theme.Champagne
 import com.example.ui.theme.DarkGraphite
 import com.example.ui.theme.LiveRed
+import com.example.ui.theme.MetalCharcoal
+import com.example.ui.theme.MetalCharcoalElevated
 import com.example.ui.theme.PaleGold
 import com.example.ui.theme.TvBroadcastScarlet
 import com.example.ui.theme.TvCrimsonRose
@@ -98,6 +107,7 @@ import com.example.ui.theme.luxuryFocusableCard
 import com.example.ui.theme.tvFocusablePill
 import com.example.util.StreamMetadataParser
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveTvScreen(
     viewModel: LiveTvViewModel,
@@ -111,11 +121,7 @@ fun LiveTvScreen(
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(TvMidnightSlate, TvTwilightIndigo, TvDeepMaroon.copy(alpha = 0.65f))
-                    )
-                )
+                .background(DarkGraphite)
                 .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -128,14 +134,14 @@ fun LiveTvScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "No Active Xtream Account",
+                    text = "No account connected",
                     color = PaleGold,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Open the navigation menu or tap the server icon to connect your SetPlay IPTV account.",
+                    text = "Open Settings → Accounts & servers to connect your Xtream account.",
                     color = Champagne,
                     fontSize = 13.sp
                 )
@@ -151,8 +157,9 @@ fun LiveTvScreen(
     val channels by viewModel.channels.collectAsStateWithLifecycle()
     val currentLimit by viewModel.currentLimit.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val isLoadingChannels by viewModel.isLoadingChannels.collectAsStateWithLifecycle()
 
-    // Pulsing broadcast signal animation for Live TV Studio identity
+    // Pulsing broadcast signal animation for live channel cards
     val infiniteTransition = rememberInfiniteTransition(label = "live_pulse")
     val livePulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.45f,
@@ -164,172 +171,264 @@ fun LiveTvScreen(
         label = "live_dot_alpha"
     )
 
-    // Intercept system back button when viewing a category's channels to return to the Category Directory
-    BackHandler(enabled = selectedCategory != null) {
-        viewModel.selectCategory(null)
+    var showAllCategoriesSheet by remember { mutableStateOf(false) }
+
+    val allCategory = remember(activePlaylist.channelCount) {
+        CategoryWithCount(
+            categoryId = LiveTvViewModel.ALL_CHANNELS_CATEGORY_ID,
+            categoryName = "All",
+            type = "LIVE",
+            isLocked = false,
+            streamCount = activePlaylist.channelCount
+        )
+    }
+    val isAllSelected = selectedCategory == null || selectedCategory?.categoryId == LiveTvViewModel.ALL_CHANNELS_CATEGORY_ID
+
+    // Selecting a category: locked ones go through the parental PIN first.
+    val chooseCategory: (CategoryWithCount?) -> Unit = { category ->
+        if (category == null || category.categoryId == LiveTvViewModel.ALL_CHANNELS_CATEGORY_ID) {
+            viewModel.selectCategory(null)
+        } else if (category.isLocked && !isParentalUnlocked) {
+            onRequestUnlockCategory?.invoke(category) { viewModel.selectCategory(category) }
+        } else {
+            viewModel.selectCategory(category)
+        }
     }
 
-    Column(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        TvMidnightSlate,
-                        TvTwilightIndigo.copy(alpha = 0.72f),
-                        TvMidnightSlate
-                    )
-                )
-            )
+            .background(DarkGraphite)
             .testTag("live_tv_screen")
     ) {
-        if (selectedCategory == null) {
-            // =========================================================================
-            // STAGE 1: BROADCAST STUDIO CONTROL DECK (#1F313B • #383852 • #784259 • #B94E56 • #BE4039 • #683536)
-            // =========================================================================
-            Column(
+        val isWide = maxWidth >= 840.dp
+        val columnCount = calculateLiveTvGridColumns(maxWidth.value.toInt())
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Search across the selected category (or all channels)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // Sleek 36.dp Single-Line Glass Telemetry Bar (Reclaims 35% of Vertical Screen Space)
-                Surface(
+                OutlinedTextField(
+                    value = channelFilterQuery,
+                    onValueChange = { viewModel.onChannelFilterQueryChanged(it) },
+                    placeholder = {
+                        Text(
+                            text = if (isAllSelected) {
+                                "Search %,d channels".format(activePlaylist.channelCount)
+                            } else {
+                                "Search in ${selectedCategory?.categoryName.orEmpty()}"
+                            },
+                            color = Champagne.copy(alpha = 0.65f),
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Search channels", tint = Champagne)
+                    },
+                    trailingIcon = {
+                        if (channelFilterQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.onChannelFilterQueryChanged("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Champagne)
+                            }
+                        }
+                    },
+                    singleLine = true,
                     shape = RoundedCornerShape(12.dp),
-                    color = TvTwilightIndigo.copy(alpha = 0.88f),
-                    border = BorderStroke(
-                        width = 0.8.dp,
-                        color = TvBroadcastScarlet.copy(alpha = 0.35f)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AmberGold,
+                        unfocusedBorderColor = Champagne.copy(alpha = 0.3f),
+                        focusedContainerColor = MetalCharcoal,
+                        unfocusedContainerColor = MetalCharcoal,
+                        focusedTextColor = PaleGold,
+                        unfocusedTextColor = PaleGold
                     ),
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(36.dp)
+                        .weight(1f)
+                        .testTag("channel_search_input")
+                )
+
+                Surface(
+                    color = MetalCharcoal,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Champagne.copy(alpha = 0.3f)),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .tvFocusablePill(
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = { viewModel.refreshLiveTv(activePlaylist) }
+                        )
+                        .testTag("section_refresh_button")
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        TvDeepMaroon.copy(alpha = 0.78f),
-                                        TvTwilightIndigo,
-                                        TvMidnightSlate
-                                    )
-                                )
-                            )
-                            .padding(horizontal = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(7.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .alpha(livePulseAlpha)
-                                    .background(TvBroadcastScarlet, CircleShape)
-                            )
-                            Text(
-                                text = "LIVE TV",
-                                color = TvCrimsonRose,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 0.4.sp
-                            )
-                            Text(
-                                text = "•",
-                                color = Champagne.copy(alpha = 0.45f),
-                                fontSize = 10.sp
-                            )
-                            Text(
-                                text = "%,d Channels • Instant Zap".format(activePlaylist.channelCount),
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                    Box(contentAlignment = Alignment.Center) {
+                        if (isRefreshing) {
+                            CircularProgressIndicator(color = AmberGold, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh channels", tint = Champagne, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+
+            if (!isWide) {
+                // Phone: category chips in one row, with "All categories" opening the searchable sheet
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("live_category_chips")
+                ) {
+                    item(key = "__all__") {
+                        CategoryChip(
+                            label = "All",
+                            selected = isAllSelected,
+                            onClick = { chooseCategory(null) }
+                        )
+                    }
+                    items(categories.take(MAX_CATEGORY_CHIPS), key = { it.categoryId }) { category ->
+                        CategoryChip(
+                            label = category.categoryName,
+                            selected = selectedCategory?.categoryId == category.categoryId,
+                            locked = category.isLocked && !isParentalUnlocked,
+                            onClick = { chooseCategory(category) }
+                        )
+                    }
+                    if (categories.size > MAX_CATEGORY_CHIPS) {
+                        item(key = "__more__") {
+                            CategoryChip(
+                                label = "All categories",
+                                selected = false,
+                                trailingArrow = true,
+                                onClick = { showAllCategoriesSheet = true }
                             )
                         }
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Surface(
-                                color = Color.White.copy(alpha = 0.08f),
-                                shape = RoundedCornerShape(50),
-                                border = BorderStroke(0.6.dp, PaleGold.copy(alpha = 0.35f))
-                            ) {
-                                Text(
-                                    text = "${categories.size} BOUQUETS",
-                                    color = PaleGold,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp)
-                                )
-                            }
-
-                            Surface(
-                                color = TvBroadcastScarlet.copy(alpha = 0.18f),
-                                shape = RoundedCornerShape(50),
-                                border = BorderStroke(0.7.dp, TvCrimsonRose.copy(alpha = 0.55f)),
-                                modifier = Modifier
-                                    .height(24.dp)
-                                    .tvFocusablePill(
-                                        accentColor = TvCrimsonRose,
-                                        onClick = { viewModel.refreshLiveTv(activePlaylist) }
-                                    )
-                                    .testTag("section_refresh_button")
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier.padding(horizontal = 8.dp)
-                                ) {
-                                    if (isRefreshing) {
-                                        CircularProgressIndicator(
-                                            color = TvCrimsonRose,
-                                            strokeWidth = 1.5.dp,
-                                            modifier = Modifier.size(11.dp)
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.Refresh,
-                                            contentDescription = "Refresh Live TV",
-                                            tint = TvCrimsonRose,
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = if (isRefreshing) "Syncing…" else "Refresh",
-                                        color = Color.White,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.ExtraBold
-                                    )
-                                }
-                            }
+            Row(modifier = Modifier.fillMaxSize()) {
+                if (isWide) {
+                    // TV / wide: category column beside the grid (Up/Down to browse, Right into channels)
+                    LazyColumn(
+                        contentPadding = PaddingValues(start = 16.dp, end = 8.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .width(200.dp)
+                            .fillMaxHeight()
+                            .testTag("live_category_column")
+                    ) {
+                        item(key = "__all__") {
+                            CategoryListRow(
+                                category = allCategory,
+                                selected = isAllSelected,
+                                locked = false,
+                                onClick = { chooseCategory(null) }
+                            )
+                        }
+                        items(categories, key = { it.categoryId }) { category ->
+                            CategoryListRow(
+                                category = category,
+                                selected = selectedCategory?.categoryId == category.categoryId,
+                                locked = category.isLocked && !isParentalUnlocked,
+                                onClick = { chooseCategory(category) }
+                            )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                when {
+                    activePlaylist.channelCount == 0 -> EmptyLiveState(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        title = "No channels yet",
+                        body = "Open Settings → Accounts & servers and sync your account to load channels."
+                    )
+                    channels.isEmpty() && channelFilterQuery.isNotBlank() -> EmptyLiveState(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        title = "No channels match \"$channelFilterQuery\"",
+                        body = if (isAllSelected) "Try a shorter name." else "Try a shorter name, or search in All."
+                    )
+                    channels.isEmpty() && (isLoadingChannels || isRefreshing) -> Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.weight(1f).fillMaxHeight().testTag("live_channels_loading")
+                    ) {
+                        CircularProgressIndicator(color = AmberGold, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+                    }
+                    channels.isEmpty() -> EmptyLiveState(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        title = "Nothing in this category",
+                        body = "Pick another category or search all channels."
+                    )
+                    else -> {
+                        val gridState = rememberLazyGridState()
+                        val shouldLoadMore by remember(channels.size, currentLimit) {
+                            derivedStateOf {
+                                val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                                channels.size >= currentLimit && lastVisible >= (channels.size - 24).coerceAtLeast(0)
+                            }
+                        }
+                        LaunchedEffect(shouldLoadMore) {
+                            if (shouldLoadMore) {
+                                viewModel.loadMore()
+                            }
+                        }
+                        LazyVerticalGrid(
+                            state = gridState,
+                            columns = GridCells.Fixed(if (isWide) (columnCount - 1).coerceAtLeast(2) else columnCount),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .testTag("live_channels_list"),
+                            contentPadding = PaddingValues(start = if (isWide) 8.dp else 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(channels, key = { it.id }) { channel ->
+                                ChannelCard(
+                                    channel = channel,
+                                    livePulseAlpha = livePulseAlpha,
+                                    onClick = { onChannelClick(channel) },
+                                    onToggleFavorite = { viewModel.toggleFavorite(channel.id, channel.isFavorite) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
-                // Twilight Indigo & Broadcast Scarlet Category Search Bar
+    if (showAllCategoriesSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showAllCategoriesSheet = false },
+            containerColor = MetalCharcoal
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp)
+            ) {
+                Text(
+                    text = "Categories",
+                    color = PaleGold,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(modifier = Modifier.height(10.dp))
                 OutlinedTextField(
                     value = categorySearchQuery,
                     onValueChange = { viewModel.onCategorySearchQueryChanged(it) },
-                    placeholder = {
-                        Text(
-                            text = "Search Live TV categories (e.g. Sports, News, Morocco, MENA, 4K)…",
-                            color = Champagne.copy(alpha = 0.65f),
-                            fontSize = 13.sp
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = "Search Categories", tint = TvCrimsonRose)
-                    },
+                    placeholder = { Text("Search categories", color = Champagne.copy(alpha = 0.65f), fontSize = 14.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Champagne) },
                     trailingIcon = {
                         if (categorySearchQuery.isNotEmpty()) {
                             IconButton(onClick = { viewModel.onCategorySearchQueryChanged("") }) {
@@ -338,301 +437,155 @@ fun LiveTvScreen(
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = TvBroadcastScarlet,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.08f),
-                        focusedContainerColor = TvTwilightIndigo,
-                        unfocusedContainerColor = TvTwilightIndigo.copy(alpha = 0.85f),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedBorderColor = AmberGold,
+                        unfocusedBorderColor = Champagne.copy(alpha = 0.3f),
+                        focusedContainerColor = DarkGraphite,
+                        unfocusedContainerColor = DarkGraphite,
+                        focusedTextColor = PaleGold,
+                        unfocusedTextColor = PaleGold
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("category_search_input")
                 )
-            }
-
-            if (categories.isEmpty() && activePlaylist.channelCount == 0) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Category,
-                            contentDescription = null,
-                            tint = TvCrimsonRose,
-                            modifier = Modifier.size(60.dp)
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Text(
-                            text = "No Live TV Categories Synced Yet",
-                            color = PaleGold,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Tap 'Sync Catalog' on the KickOff screen or Accounts page to download categories and channels.",
-                            color = Champagne,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
-            } else if (categories.isEmpty() && categorySearchQuery.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            tint = TvCrimsonRose,
-                            modifier = Modifier.size(56.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "No categories match \"$categorySearchQuery\"",
-                            color = PaleGold,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            } else {
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val columnCount = calculateLiveTvGridColumns(maxWidth.value.toInt())
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(columnCount),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("live_categories_directory"),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (categorySearchQuery.isBlank() && activePlaylist.channelCount > 0) {
-                            item(
-                                key = "__all_channels__",
-                                span = { GridItemSpan(columnCount) }
-                            ) {
-                                val allCat = CategoryWithCount(
-                                    categoryId = LiveTvViewModel.ALL_CHANNELS_CATEGORY_ID,
-                                    categoryName = "All Live TV Channels",
-                                    type = "LIVE",
-                                    isLocked = false,
-                                    streamCount = activePlaylist.channelCount
-                                )
-                                LiveCategoryDirectoryCard(
-                                    category = allCat,
-                                    isAllChannelsCard = true,
-                                    onClick = { viewModel.selectCategory(allCat) }
-                                )
-                            }
-                        }
-
-                        items(categories, key = { it.categoryId }) { category ->
-                            LiveCategoryDirectoryCard(
-                                category = category,
-                                isAllChannelsCard = false,
-                                onClick = {
-                                    if (category.isLocked && !isParentalUnlocked) {
-                                        onRequestUnlockCategory?.invoke(category) {
-                                            viewModel.selectCategory(category)
-                                        }
-                                    } else {
-                                        viewModel.selectCategory(category)
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        } else {
-            // =========================================================================
-            // STAGE 2: SELECTED BOUQUET CHANNELS & IN-CATEGORY FILTER
-            // =========================================================================
-            val currentCat = selectedCategory!!
-
-            Surface(
-                color = TvTwilightIndigo,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
+                Spacer(modifier = Modifier.height(10.dp))
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(TvDeepMaroon, TvPlumMagenta.copy(alpha = 0.8f), TvTwilightIndigo)
-                            )
-                        )
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .height(480.dp)
+                        .testTag("live_categories_directory")
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Tier 2 Secondary Surface Back Pill (borderless bg-white/8)
-                        Surface(
-                            color = Color.White.copy(alpha = 0.08f),
-                            shape = RoundedCornerShape(50),
-                            modifier = Modifier
-                                .height(32.dp)
-                                .clip(RoundedCornerShape(50))
-                                .tvFocusablePill(
-                                    accentColor = TvBroadcastScarlet,
-                                    shape = RoundedCornerShape(50),
-                                    onClick = { viewModel.selectCategory(null) }
-                                )
-                                .testTag("back_to_categories_btn")
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 12.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back to Categories",
-                                    tint = TvCrimsonRose,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                                Spacer(modifier = Modifier.width(5.dp))
-                                Text(
-                                    text = "Categories",
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = currentCat.categoryName,
-                                color = Color.White,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = if (currentCat.streamCount > 0) "%,d live channels in bouquet".format(currentCat.streamCount) else "Browse channels in bouquet",
-                                color = TvCrimsonRose,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // In-category channel filter bar
-                    OutlinedTextField(
-                        value = channelFilterQuery,
-                        onValueChange = { viewModel.onChannelFilterQueryChanged(it) },
-                        placeholder = {
-                            Text(
-                                text = "Filter channels inside ${currentCat.categoryName}…",
-                                color = Champagne.copy(alpha = 0.65f),
-                                fontSize = 13.sp
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = "Filter Channels", tint = TvCrimsonRose)
-                        },
-                        trailingIcon = {
-                            if (channelFilterQuery.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.onChannelFilterQueryChanged("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Champagne)
+                    if (categorySearchQuery.isBlank()) {
+                        item(key = "__all_channels__", span = { GridItemSpan(2) }) {
+                            LiveCategoryDirectoryCard(
+                                category = allCategory.copy(categoryName = "All channels"),
+                                isAllChannelsCard = true,
+                                onClick = {
+                                    chooseCategory(null)
+                                    showAllCategoriesSheet = false
                                 }
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(22.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = TvBroadcastScarlet,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.08f),
-                            focusedContainerColor = TvMidnightSlate,
-                            unfocusedContainerColor = TvMidnightSlate,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("channel_search_input")
-                    )
-                }
-            }
-
-            if (channels.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.LiveTv,
-                            contentDescription = null,
-                            tint = TvCrimsonRose,
-                            modifier = Modifier.size(56.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "No channels found in this category.",
-                            color = PaleGold,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            } else {
-                val gridState = rememberLazyGridState()
-                val shouldLoadMore by remember(channels.size, currentLimit) {
-                    derivedStateOf {
-                        val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                        channels.size >= currentLimit && lastVisible >= (channels.size - 24).coerceAtLeast(0)
-                    }
-                }
-                LaunchedEffect(shouldLoadMore) {
-                    if (shouldLoadMore) {
-                        viewModel.loadMore()
-                    }
-                }
-
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val columnCount = calculateLiveTvGridColumns(maxWidth.value.toInt())
-                    LazyVerticalGrid(
-                        state = gridState,
-                        columns = GridCells.Fixed(columnCount),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("live_channels_list"),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(channels, key = { it.id }) { channel ->
-                            ChannelCard(
-                                channel = channel,
-                                livePulseAlpha = livePulseAlpha,
-                                onClick = { onChannelClick(channel) },
-                                onToggleFavorite = { viewModel.toggleFavorite(channel.id, channel.isFavorite) }
                             )
                         }
                     }
+                    items(categories, key = { it.categoryId }) { category ->
+                        LiveCategoryDirectoryCard(
+                            category = category,
+                            isAllChannelsCard = false,
+                            onClick = {
+                                chooseCategory(category)
+                                showAllCategoriesSheet = false
+                            }
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+private const val MAX_CATEGORY_CHIPS = 14
+
+@Composable
+private fun CategoryChip(
+    label: String,
+    selected: Boolean,
+    locked: Boolean = false,
+    trailingArrow: Boolean = false,
+    onClick: () -> Unit
+) {
+    Surface(
+        color = if (selected) AmberGold else Color.Transparent,
+        shape = RoundedCornerShape(50),
+        border = if (selected) null else BorderStroke(1.dp, Champagne.copy(alpha = 0.3f)),
+        modifier = Modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(50))
+            .tvFocusablePill(onClick = onClick)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = 12.dp)
+        ) {
+            if (locked) {
+                Icon(Icons.Default.Lock, contentDescription = "Locked", tint = Champagne, modifier = Modifier.size(12.dp))
+            }
+            Text(
+                text = label,
+                color = if (selected) DarkGraphite else Champagne,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (trailingArrow) {
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Champagne, modifier = Modifier.size(14.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryListRow(
+    category: CategoryWithCount,
+    selected: Boolean,
+    locked: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) MetalCharcoalElevated else Color.Transparent)
+            .tvFocusablePill(shape = RoundedCornerShape(10.dp), focusedScale = 1.0f, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 9.dp)
+    ) {
+        Text(
+            text = category.categoryName,
+            color = if (selected) PaleGold else Champagne,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        if (locked) {
+            Icon(Icons.Default.Lock, contentDescription = "Locked", tint = Champagne, modifier = Modifier.size(12.dp))
+        } else if (category.streamCount > 0) {
+            Text(
+                text = "%,d".format(category.streamCount),
+                color = Champagne.copy(alpha = 0.7f),
+                fontSize = 11.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyLiveState(title: String, body: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Default.LiveTv,
+                contentDescription = null,
+                tint = Champagne,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(text = title, color = PaleGold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = body, color = Champagne, fontSize = 13.sp)
         }
     }
 }

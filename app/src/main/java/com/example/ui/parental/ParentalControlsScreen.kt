@@ -152,7 +152,7 @@ fun ParentalControlsScreen(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "Parental Controls & PIN",
+                        text = "Parental lock",
                         color = TextPrimary,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
