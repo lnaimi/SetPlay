@@ -150,6 +150,7 @@ import com.example.ui.theme.MenaSscTeal
 import com.example.ui.theme.TabularNumeralTextStyle
 import com.example.ui.theme.luxuryFocusableCard
 import com.example.ui.theme.tvFocusableControl
+import com.example.ui.theme.tvFocusablePill
 import com.example.ui.viewmodel.AppScreen
 import com.example.ui.viewmodel.BeinChannelMatcherState
 import com.example.ui.viewmodel.LiveGoalAlertEvent
@@ -3851,6 +3852,8 @@ private fun TvKickoffStadiumScreen(
                                         onFocused = { focusedTvMatch = match },
                                         onClick = { onOpenDossier(match) },
                                         onWatchClick = { onWatchChannel(match, match.beinChannel) },
+                                        isPinned = match.matchId in pinnedMatchIds,
+                                        onTogglePin = { onTogglePinMatch(match.matchId) },
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
@@ -3876,6 +3879,8 @@ private fun TvWidescreenMatchGridCard(
     onFocused: () -> Unit,
     onClick: () -> Unit,
     onWatchClick: () -> Unit,
+    isPinned: Boolean = false,
+    onTogglePin: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -4104,18 +4109,40 @@ private fun TvWidescreenMatchGridCard(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
+                // Pin (the TV side panel used to hold this; it now sits on the card)
+                Surface(
+                    color = if (isPinned) KickoffPitchEmerald.copy(alpha = 0.22f) else KickoffCanopyElevated,
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(0.8.dp, if (isPinned) KickoffPitchEmerald else KickoffEmeraldBorder),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .tvFocusablePill(onClick = onTogglePin)
+                        .testTag("tv_pin_match_btn_${match.matchId}")
+                ) {
+                    Text(
+                        text = if (isPinned) "★ Pinned" else "☆ Pin",
+                        color = KickoffFloodlightWhite,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
                 Surface(
                     color = if (isLive) KickoffPitchEmerald else KickoffCanopyElevated,
                     shape = RoundedCornerShape(50),
                     border = BorderStroke(0.8.dp, if (isLive) KickoffFloodlightVolt else KickoffPitchEmerald),
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
-                        .clickable { onWatchClick() }
+                        .tvFocusablePill(onClick = onWatchClick)
                         .testTag("watch_bein_btn_${match.matchId}")
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                     ) {
                         Text(
                             text = if (isLive) "▶ Watch Live" else "▶ Watch",

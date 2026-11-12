@@ -24,6 +24,10 @@ val GraphiteHairline = Color(0xFF3A3E46)      // Solid hairline for containers o
 val GraphiteHairlineSoft = Color(0x14F6E8C8)  // 8% Pale Gold row dividers
 val AmberGlow = Color(0x33D4A238)             // 20% Amber Gold focus halo / active glow
 val LiveRedGlow = Color(0x33E5484D)           // 20% Live Red in-play aura
+// Match Center team sides: home takes the gold accent, away a steel blue so the two
+// differ in hue, not only in brightness (momentum wave, shot map, stat bars, goals).
+val HomeTeamAccent = AmberGold
+val AwayTeamAccent = Color(0xFF6FA8DC)
 
 // =========================================================================
 // 5-Section Bespoke Brand Kit Palettes (From User's 5 Section Color Sheets)
@@ -34,7 +38,7 @@ val LiveRedGlow = Color(0x33E5484D)           // 20% Live Red in-play aura
 // former value is kept in the comment. League, broadcaster and pitch colours are unchanged.
 
 // 1. KICKOFF ARENA PALETTE (Legacy tokens preserved for backward compatibility + Official 6-Color Architectural Palette)
-val KickoffCeruleanBlue = MetalCharcoalElevated   // was 0xFF0081A7 — #0081A7 — Legacy Primary Cerulean Ocean Blue
+val KickoffCeruleanBlue = AmberGold   // was 0xFF0081A7 — #0081A7 — Legacy Primary Cerulean Ocean Blue
 val KickoffTropicalTeal = AmberGold   // was 0xFF00AFB9 — #00AFB9 — Legacy Vibrant Tropical Teal-Cyan
 val KickoffPeachCream = PaleGold   // was 0xFFFED9B7 — #FED9B7 — Legacy Warm Peach-Champagne highlight & badge text
 val KickoffCoralRed = LiveRed   // was 0xFFF07167 — #F07167 — Legacy Vibrant Coral-Red live & action accent
@@ -66,7 +70,7 @@ val KickoffGlassWell = GraphiteWell   // was 0xFF1C2C28 — Level 3: Recessed ce
 
 // 2. Primary, Secondary & Signal Brand Accents
 val KickoffPitchEmerald = AmberGold   // was 0xFF10B981 — Primary Brand Identity: Watch CTAs, active pillar/tab fills, confirmed XI
-val KickoffFloodlightVolt = PaleGold   // was 0xFFD4FF33 — Kinetic Highlight: Active date laser bar, TV D-Pad focus rim, MVP crown
+val KickoffFloodlightVolt = AmberGold   // was 0xFFD4FF33 — Kinetic Highlight: Active date laser bar, TV D-Pad focus rim, MVP crown
 val KickoffStadiumForest = Color(0xFF0B3B2D)    // Deep Secondary Surface: Hero live match gradient & 2D pitch turf base
 val KickoffStadiumTurfAlt = Color(0xFF0F4C3A)   // Alternating 2D tactical pitch stripe
 val KickoffLiveCrimson = LiveRed   // was 0xFFFF2E54 — Exclusive Live Signal: Pulsing LIVE badge, live minute clock & red cards

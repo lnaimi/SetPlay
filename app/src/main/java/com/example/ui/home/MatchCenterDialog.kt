@@ -108,6 +108,7 @@ import com.example.ui.theme.KickoffFloodlightVolt
 import com.example.ui.theme.KickoffFloodlightWhite
 import com.example.ui.theme.KickoffGlassWell
 import com.example.ui.theme.KickoffLiveCrimson
+import com.example.ui.theme.AwayTeamAccent
 import com.example.ui.theme.KickoffMistSilver
 import com.example.ui.theme.KickoffPitchBlack
 import com.example.ui.theme.KickoffPitchEmerald
@@ -3790,7 +3791,7 @@ internal fun AttackMomentumWaveCard(
                             )
                         } else {
                             drawRoundRect(
-                                color = KickoffMistSilver.copy(alpha = 0.85f),
+                                color = AwayTeamAccent.copy(alpha = 0.85f),
                                 topLeft = Offset(x, centerY),
                                 size = Size(barWidth, barH),
                                 cornerRadius = CornerRadius(2f, 2f)
@@ -3803,7 +3804,7 @@ internal fun AttackMomentumWaveCard(
                         val gx = ((goal.minute.coerceIn(1, totalMinutes) - 0.5f) / totalMinutes.toFloat()) * size.width
                         val gy = if (goal.teamSide == MatchTeamSide.HOME) 9f else size.height - 9f
                         drawCircle(
-                            color = if (goal.teamSide == MatchTeamSide.HOME) KickoffFloodlightVolt else KickoffMistSilver,
+                            color = if (goal.teamSide == MatchTeamSide.HOME) KickoffFloodlightVolt else AwayTeamAccent,
                             radius = 5.5f,
                             center = Offset(gx, gy)
                         )
@@ -3983,7 +3984,7 @@ internal fun ShotMapVisualCard(
                             center = Offset(cx, cy)
                         )
                         drawCircle(
-                            color = if (shot.teamSide == MatchTeamSide.HOME) KickoffPitchEmerald else KickoffMistSilver,
+                            color = if (shot.teamSide == MatchTeamSide.HOME) KickoffPitchEmerald else AwayTeamAccent,
                             radius = baseRadius,
                             center = Offset(cx, cy),
                             style = Stroke(width = 1.8f)
@@ -4126,7 +4127,7 @@ private fun StatComparisonBarCard(
             Spacer(modifier = Modifier.height(6.dp))
 
             // Dual Comparison Progress Bar Track in KickoffGlassWell (#1C2C28)
-            // Home bar in KickoffPitchEmerald (#10B981) / KickoffFloodlightVolt (#D4FF33), Away bar in KickoffMistSilver (#99AEA7)
+            // Home bar in the gold accent (brighter when leading a key metric), away bar in AwayTeamAccent
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -4145,7 +4146,7 @@ private fun StatComparisonBarCard(
                     modifier = Modifier
                         .weight((1f - stat.homeRatio).coerceIn(0.08f, 0.92f))
                         .fillMaxHeight()
-                        .background(KickoffMistSilver)
+                        .background(AwayTeamAccent)
                 )
             }
         }

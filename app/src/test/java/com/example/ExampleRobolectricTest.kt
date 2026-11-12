@@ -123,7 +123,7 @@ class ExampleRobolectricTest {
         assertEquals(com.example.ui.theme.AmberGold, SeriesJadeAccent)
 
         // 1. KickOff Section Palette (Legacy & Official 6-Color Architectural Palette)
-        assertEquals(com.example.ui.theme.MetalCharcoalElevated, KickoffCeruleanBlue)
+        assertEquals(com.example.ui.theme.AmberGold, KickoffCeruleanBlue)
         assertEquals(com.example.ui.theme.AmberGold, KickoffTropicalTeal)
         assertEquals(com.example.ui.theme.PaleGold, KickoffPeachCream)
         assertEquals(com.example.ui.theme.LiveRed, KickoffCoralRed)
@@ -4962,7 +4962,7 @@ class TvSyncDeviceSeparationComposeTest {
         assertEquals(com.example.ui.theme.MetalCharcoalElevated, com.example.ui.theme.KickoffCanopyElevated)
         assertEquals(com.example.ui.theme.GraphiteWell, com.example.ui.theme.KickoffGlassWell)
         assertEquals(com.example.ui.theme.AmberGold, com.example.ui.theme.KickoffPitchEmerald)
-        assertEquals(com.example.ui.theme.PaleGold, com.example.ui.theme.KickoffFloodlightVolt)
+        assertEquals(com.example.ui.theme.AmberGold, com.example.ui.theme.KickoffFloodlightVolt)
         assertEquals(Color(0xFF0B3B2D), com.example.ui.theme.KickoffStadiumForest)
         assertEquals(Color(0xFF0F4C3A), com.example.ui.theme.KickoffStadiumTurfAlt)
         assertEquals(com.example.ui.theme.LiveRed, com.example.ui.theme.KickoffLiveCrimson)
@@ -5198,7 +5198,7 @@ class TvSyncDeviceSeparationComposeTest {
         assertEquals(com.example.ui.theme.DarkGraphite, com.example.ui.theme.KickoffPitchBlack)
         assertEquals(com.example.ui.theme.MetalCharcoal, com.example.ui.theme.KickoffTurfSurface)
         assertEquals(com.example.ui.theme.AmberGold, com.example.ui.theme.KickoffPitchEmerald)
-        assertEquals(com.example.ui.theme.PaleGold, com.example.ui.theme.KickoffFloodlightVolt)
+        assertEquals(com.example.ui.theme.AmberGold, com.example.ui.theme.KickoffFloodlightVolt)
         assertEquals(Color(0xFF0B3B2D), com.example.ui.theme.KickoffStadiumForest)
         assertEquals(com.example.ui.theme.LiveRed, com.example.ui.theme.KickoffLiveCrimson)
 

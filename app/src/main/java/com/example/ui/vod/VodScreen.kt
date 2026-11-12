@@ -1869,7 +1869,7 @@ fun SeriesDetailHierarchyScreen(
                         ) {
                             Text(
                                 text = "SERIES VAULT",
-                                color = SeriesIceAqua,
+                                color = SeriesPineBase,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -1929,13 +1929,13 @@ fun SeriesDetailHierarchyScreen(
                                     Icon(
                                         Icons.Default.Star,
                                         contentDescription = null,
-                                        tint = SeriesIceAqua,
+                                        tint = SeriesPineBase,
                                         modifier = Modifier.size(12.dp)
                                     )
                                     Spacer(modifier = Modifier.width(3.dp))
                                     Text(
                                         text = ratingText.take(3),
-                                        color = SeriesIceAqua,
+                                        color = SeriesPineBase,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
                                     )

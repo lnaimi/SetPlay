@@ -863,7 +863,7 @@ fun MainAppContent(
                         // Coming back from the rail with → returns to the item last focused in this section.
                         .tvContentFocusRestorer()
                 ) {
-                    TvSectionHeader(
+                    if (currentScreen != AppScreen.PLAYLISTS && currentScreen != AppScreen.PARENTAL_SETTINGS) TvSectionHeader(
                         currentScreen = currentScreen,
                         sectionDetailSummary = topSectionDetailText
                     ) {
