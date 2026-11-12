@@ -117,7 +117,8 @@ jobs:
           retention-days: 90
 
       - name: Publish Dual Release Assets to GitHub Releases
-        if: github.event_name != 'pull_request'
+        # Only builds of main (or a manual run) replace the public download links.
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -135,8 +136,8 @@ jobs:
 
           | Edition | Target Devices | Direct 1-Click Download |
           | :--- | :--- | :---: |
-          | 📱 **`SetPlay-Phone.apk`**<br>*(Touch & Companion Edition)* | **Android Phones, Tablets & Foldables**<br>Top/Bottom Glass Nav • Floating PiP • Wi-Fi TV Companion Remote | **[📲 Download `SetPlay-Phone.apk`](https://github.com/MPadberg-svg/SetPlay/releases/latest/download/SetPlay-Phone.apk)** |
-          | 📺 **`SetPlay-TV.apk`**<br>*(10-Foot Living Room Edition)* | **Android TV, Google TV & Fire TV**<br>Left Glass Nav Rail • Live Channel Zapper Sidebar • Auto Wi-Fi Sync Host | **[📺 Download `SetPlay-TV.apk`](https://github.com/MPadberg-svg/SetPlay/releases/latest/download/SetPlay-TV.apk)** |
+          | 📱 **`SetPlay-Phone.apk`**<br>*(Touch & Companion Edition)* | **Android Phones, Tablets & Foldables**<br>Top/Bottom Glass Nav • Floating PiP • Wi-Fi TV Companion Remote | **[📲 Download `SetPlay-Phone.apk`](https://github.com/lnaimi/SetPlay/releases/latest/download/SetPlay-Phone.apk)** |
+          | 📺 **`SetPlay-TV.apk`**<br>*(10-Foot Living Room Edition)* | **Android TV, Google TV & Fire TV**<br>Left Glass Nav Rail • Live Channel Zapper Sidebar • Auto Wi-Fi Sync Host | **[📺 Download `SetPlay-TV.apk`](https://github.com/lnaimi/SetPlay/releases/latest/download/SetPlay-TV.apk)** |
 
           ---
 
