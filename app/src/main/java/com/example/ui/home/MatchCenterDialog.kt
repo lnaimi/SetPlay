@@ -109,6 +109,7 @@ import com.example.ui.theme.KickoffFloodlightWhite
 import com.example.ui.theme.KickoffGlassWell
 import com.example.ui.theme.KickoffLiveCrimson
 import com.example.ui.theme.AwayTeamAccent
+import com.example.ui.theme.HomeTeamAccent
 import com.example.ui.theme.KickoffMistSilver
 import com.example.ui.theme.KickoffPitchBlack
 import com.example.ui.theme.KickoffPitchEmerald
@@ -3725,7 +3726,7 @@ internal fun AttackMomentumWaveCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = dossier.match.awayTeamName.uppercase(),
-                        color = KickoffMistSilver,
+                        color = AwayTeamAccent,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1,
@@ -3736,7 +3737,7 @@ internal fun AttackMomentumWaveCard(
                         modifier = Modifier
                             .size(8.dp)
                             .clip(CircleShape)
-                            .background(KickoffMistSilver)
+                            .background(AwayTeamAccent)
                     )
                 }
             }
@@ -4127,7 +4128,7 @@ private fun StatComparisonBarCard(
             Spacer(modifier = Modifier.height(6.dp))
 
             // Dual Comparison Progress Bar Track in KickoffGlassWell (#1C2C28)
-            // Home bar in the gold accent (brighter when leading a key metric), away bar in AwayTeamAccent
+            // Home bar in HomeTeamAccent (pale gold when leading a key metric), away bar in AwayTeamAccent
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -4139,7 +4140,7 @@ private fun StatComparisonBarCard(
                     modifier = Modifier
                         .weight(stat.homeRatio.coerceIn(0.08f, 0.92f))
                         .fillMaxHeight()
-                        .background(if (stat.isKeyMetric && isHomeLeading) KickoffFloodlightVolt else KickoffPitchEmerald)
+                        .background(if (stat.isKeyMetric && isHomeLeading) KickoffFloodlightWhite else HomeTeamAccent)
                 )
                 Spacer(modifier = Modifier.width(2.dp))
                 Box(

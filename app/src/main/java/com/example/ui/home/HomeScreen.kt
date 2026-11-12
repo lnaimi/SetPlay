@@ -4116,16 +4116,17 @@ private fun TvWidescreenMatchGridCard(
                     border = BorderStroke(0.8.dp, if (isPinned) KickoffPitchEmerald else KickoffEmeraldBorder),
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
+                        .heightIn(min = 36.dp)
                         .tvFocusablePill(onClick = onTogglePin)
                         .testTag("tv_pin_match_btn_${match.matchId}")
                 ) {
                     Text(
                         text = if (isPinned) "★ Pinned" else "☆ Pin",
                         color = KickoffFloodlightWhite,
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)
                     )
                 }
 
@@ -4137,17 +4138,18 @@ private fun TvWidescreenMatchGridCard(
                     border = BorderStroke(0.8.dp, if (isLive) KickoffFloodlightVolt else KickoffPitchEmerald),
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
+                        .heightIn(min = 36.dp)
                         .tvFocusablePill(onClick = onWatchClick)
                         .testTag("watch_bein_btn_${match.matchId}")
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)
                     ) {
                         Text(
-                            text = if (isLive) "▶ Watch Live" else "▶ Watch",
+                            text = if (isLive) "▶ Watch live" else "▶ Watch",
                             color = if (isLive) KickoffPitchBlack else KickoffFloodlightWhite,
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.ExtraBold,
                             maxLines = 1
                         )
