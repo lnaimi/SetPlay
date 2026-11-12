@@ -19,6 +19,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
+import com.example.ui.theme.calculateLiveTvGridColumns
+import com.example.ui.theme.tvFocusablePill
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -155,92 +162,13 @@ fun FavoritesScreen(
         val movieFavCount = remember(favorites) { favorites.count { it.streamType.equals("movie", ignoreCase = true) } }
         val seriesFavCount = remember(favorites) { favorites.count { it.streamType.equals("series", ignoreCase = true) } }
 
-        // Sleek 36.dp Single-Line Glass Telemetry Bar
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = FavoritesEmeraldCard.copy(alpha = 0.88f),
-            border = BorderStroke(
-                width = 0.8.dp,
-                color = FavoritesSagePrimary.copy(alpha = 0.38f)
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(36.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                FavoritesEvergreenSurface,
-                                FavoritesEmeraldCard,
-                                FavoritesBotanicalBorder.copy(alpha = 0.85f)
-                            )
-                        )
-                    )
-                    .padding(horizontal = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = FavoritesPaleMint,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = "FAVORITES",
-                        color = FavoritesPaleMint,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.4.sp
-                    )
-                    Text(
-                        text = "•",
-                        color = FavoritesSagePrimary.copy(alpha = 0.55f),
-                        fontSize = 10.sp
-                    )
-                    Text(
-                        text = "${favorites.size} Saved ($liveFavCount Live • $movieFavCount Movies • $seriesFavCount Series)",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Surface(
-                    color = Color.White.copy(alpha = 0.08f),
-                    shape = RoundedCornerShape(50),
-                    border = BorderStroke(0.6.dp, FavoritesSagePrimary.copy(alpha = 0.35f))
-                ) {
-                    Text(
-                        text = "$liveFavCount LIVE",
-                        color = FavoritesPaleMint,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp)
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
         // Botanical Sage Search Bar
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             placeholder = {
                 Text(
-                    text = "Filter saved VIP channels, movies & series (e.g. beIN, Arryadia, SSC)…",
+                    text = "Search favorites",
                     color = FavoritesSagePrimary.copy(alpha = 0.65f),
                     fontSize = 13.sp
                 )
@@ -264,7 +192,7 @@ fun FavoritesScreen(
                 }
             },
             singleLine = true,
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = FavoritesSagePrimary,
                 unfocusedBorderColor = Color.White.copy(alpha = 0.08f),
@@ -288,8 +216,8 @@ fun FavoritesScreen(
             val filters = listOf(
                 null to "All (${favorites.size})",
                 "live" to "Live TV ($liveFavCount)",
-                "movie" to "Movies",
-                "series" to "Series"
+                "movie" to "Movies ($movieFavCount)",
+                "series" to "Series ($seriesFavCount)"
             )
             items(filters, key = { it.first ?: "all" }) { (key, label) ->
                 val isSelected = selectedFilter == key
@@ -297,15 +225,16 @@ fun FavoritesScreen(
                     color = if (isSelected) FavoritesSagePrimary else Color.White.copy(alpha = 0.06f),
                     shape = RoundedCornerShape(50),
                     modifier = Modifier
+                        .heightIn(min = 36.dp)
                         .clip(RoundedCornerShape(50))
-                        .clickable { selectedFilter = if (isSelected && key != null) null else key }
+                        .tvFocusablePill(onClick = { selectedFilter = if (isSelected && key != null) null else key })
                 ) {
                     Text(
                         text = label,
                         color = if (isSelected) FavoritesObsidianBase else FavoritesPaleMint,
                         fontSize = 12.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.5.dp)
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
                     )
                 }
             }
@@ -329,25 +258,30 @@ fun FavoritesScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "No VIP Favorites yet.",
+                        text = if (favorites.isEmpty()) "No favorites yet" else "Nothing matches this filter",
                         color = FavoritesPaleMint,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Tap the star icon on any Live TV channel (such as beIN Sports or Arryadia), movie, or series to pin it into your VIP Vault.",
+                        text = if (favorites.isEmpty()) "Tap the star on any channel, movie or series to save it here." else "Try another filter or clear the search.",
                         color = FavoritesSagePrimary,
                         fontSize = 13.sp
                     )
                 }
             }
         } else {
-            LazyColumn(
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(calculateLiveTvGridColumns(maxWidth.value.toInt())),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxSize()
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("favorites_list")
             ) {
-                items(filteredList, key = { it.id }) { item ->
+                gridItems(filteredList, key = { it.id }) { item ->
                     val isLiveChannel = item.streamType.equals("live", ignoreCase = true)
                     val cleanTitle = remember(item.name) {
                         StreamMetadataParser.cleanDisplayTitle(item.name)
@@ -556,6 +490,7 @@ fun FavoritesScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

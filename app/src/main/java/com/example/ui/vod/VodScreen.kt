@@ -305,141 +305,14 @@ fun VodScreen(
             StreamMetadataParser.cleanDisplayTitle(it)
         } ?: if (isMovies) "All Cinema" else "All Series"
 
-        // Sleek 36.dp Single-Line Glass Telemetry Bar (Reclaims 35% of Vertical Screen Space)
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = (if (isMovies) MoviesAtlanticTeal else SeriesCypressCard).copy(alpha = 0.86f),
-            border = BorderStroke(
-                width = 0.8.dp,
-                color = sectionHighlight.copy(alpha = 0.32f)
-            ),
+        // Search, with Refresh beside it (same arrangement as Live TV)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
-                .height(36.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = if (isMovies) {
-                                listOf(MoviesSapphireNavy, MoviesAtlanticTeal, MoviesOceanTeal.copy(alpha = 0.78f))
-                            } else {
-                                listOf(SeriesPineBase, SeriesForestSurface, SeriesCypressCard)
-                            }
-                        )
-                    )
-                    .padding(horizontal = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = if (isMovies) Icons.Default.LocalMovies else Icons.Default.Layers,
-                        contentDescription = null,
-                        tint = sectionHighlight,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = if (isMovies) "CINEMA" else "SERIES",
-                        color = sectionHighlight,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.4.sp
-                    )
-                    Text(
-                        text = "•",
-                        color = Champagne.copy(alpha = 0.45f),
-                        fontSize = 10.sp
-                    )
-                    Text(
-                        text = if (isMovies) {
-                            "%,d Movies • %s".format(totalCount, activeCategoryLabel)
-                        } else {
-                            "%,d Series • %s".format(totalCount, activeCategoryLabel)
-                        },
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Surface(
-                        color = Color.White.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(50),
-                        border = BorderStroke(0.6.dp, sectionHighlight.copy(alpha = 0.35f))
-                    ) {
-                        Text(
-                            text = "${categories.size} GENRES",
-                            color = sectionHighlight,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp)
-                        )
-                    }
-
-                    Surface(
-                        color = sectionPrimaryAccent.copy(alpha = 0.22f),
-                        shape = RoundedCornerShape(50),
-                        border = BorderStroke(0.7.dp, sectionHighlight.copy(alpha = 0.55f)),
-                        modifier = Modifier
-                            .height(24.dp)
-                            .tvFocusablePill(
-                                accentColor = sectionHighlight,
-                                onClick = {
-                                    if (isMovies) {
-                                        viewModel.refreshMovies(activePlaylist)
-                                    } else {
-                                        viewModel.refreshSeries(activePlaylist)
-                                    }
-                                }
-                            )
-                            .testTag("section_refresh_button")
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(horizontal = 8.dp)
-                        ) {
-                            if (isRefreshing) {
-                                CircularProgressIndicator(
-                                    color = sectionHighlight,
-                                    strokeWidth = 1.5.dp,
-                                    modifier = Modifier.size(11.dp)
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = if (isMovies) "Refresh Movies" else "Refresh Series",
-                                    tint = sectionHighlight,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                            }
-                            Text(
-                                text = if (isRefreshing) "Syncing…" else "Refresh",
-                                color = Color.White,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Section-Tinted Search Bar
-        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onSearchChange,
@@ -470,7 +343,7 @@ fun VodScreen(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = sectionHighlight,
                     unfocusedBorderColor = Color.White.copy(alpha = 0.08f),
@@ -480,12 +353,65 @@ fun VodScreen(
                     unfocusedTextColor = Color.White
                 ),
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .weight(1f)
                     .testTag("vod_search_input")
             )
+
+            Surface(
+                color = sectionSurface,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Champagne.copy(alpha = 0.3f)),
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .tvFocusablePill(
+                        shape = RoundedCornerShape(12.dp),
+                        onClick = {
+                            if (isMovies) {
+                                viewModel.refreshMovies(activePlaylist)
+                            } else {
+                                viewModel.refreshSeries(activePlaylist)
+                            }
+                        }
+                    )
+                    .testTag("section_refresh_button")
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            color = AmberGold,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = if (isMovies) "Refresh movies" else "Refresh series",
+                            tint = Champagne,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(6.dp))
+
+        // Sleek Horizontal "Continue Watching" Rail when at root (selectedCatId == null && searchQuery.isBlank())
+        if (selectedCatId == null && searchQuery.isBlank() && continueWatchingItems.isNotEmpty()) {
+            ContinueWatchingVodRail(
+                items = continueWatchingItems,
+                isMovies = isMovies,
+                onItemClick = { item ->
+                    if (isMovies) {
+                        onItemClick(item)
+                    } else {
+                        viewModel.openSeriesDetails(item, activePlaylist)
+                    }
+                }
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+        }
 
         // Horizontal Scrolling Row of Luxury Category Capsules (Multi-Stop Gradient Active vs Frosted Glass Inactive)
         LazyRow(
@@ -601,22 +527,6 @@ fun VodScreen(
         }
 
         Spacer(modifier = Modifier.height(6.dp))
-
-        // Sleek Horizontal "Continue Watching" Rail when at root (selectedCatId == null && searchQuery.isBlank())
-        if (selectedCatId == null && searchQuery.isBlank() && continueWatchingItems.isNotEmpty()) {
-            ContinueWatchingVodRail(
-                items = continueWatchingItems,
-                isMovies = isMovies,
-                onItemClick = { item ->
-                    if (isMovies) {
-                        onItemClick(item)
-                    } else {
-                        viewModel.openSeriesDetails(item, activePlaylist)
-                    }
-                }
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-        }
 
         // Grid of Tailored Section Cards with Progressive Paging
         if (items.isEmpty()) {

@@ -437,6 +437,63 @@ private fun LiveCountBadge(count: Int, modifier: Modifier = Modifier) {
 }
 
 // -----------------------------------------------------------------------------
+// Android TV: section title bar
+// -----------------------------------------------------------------------------
+
+/**
+ * Title bar for the TV edition: the section name at 28sp with its count line,
+ * and an optional control on the right (the Movies | Series switch on Cinema).
+ */
+@Composable
+fun TvSectionHeader(
+    currentScreen: AppScreen,
+    sectionDetailSummary: String,
+    modifier: Modifier = Modifier,
+    trailing: @Composable () -> Unit = {}
+) {
+    val accent = sectionAccent(currentScreen)
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 28.dp, end = 28.dp, top = 20.dp, bottom = 8.dp)
+            .testTag("tv_section_header")
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = sectionTitle(currentScreen),
+                color = PaleGold,
+                fontSize = 28.sp,
+                lineHeight = 32.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-0.3).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (sectionDetailSummary.isNotBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(accent)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = sectionDetailSummary,
+                        color = Champagne,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+        trailing()
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Android TV: remembered focus and the remote hint bar
 // -----------------------------------------------------------------------------
 

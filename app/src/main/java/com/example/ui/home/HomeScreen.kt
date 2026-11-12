@@ -96,6 +96,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -385,42 +387,19 @@ fun HomeScreen(
                 }
             }
 
-            // Integrated Matchday Command Bar (`match_center_hero_card`)
-            item(key = "kickoff_command_bar_item") {
-                val activeLeaguesInSlate = remember(sortedVisibleMatches) {
-                    sortedVisibleMatches.map { it.tournamentId }.distinct().size
+            // Score-source problems only; everything else the old command card held now lives in
+            // the title bar (counts), the filter row (Live, Refresh, Customize) and Settings (zone).
+            if (kickoffSourceAlert != null || unhealthySourcesCount > 0) {
+                item(key = "kickoff_source_alert_strip") {
+                    KickoffSourceAlertStrip(
+                        sourceAlertMessage = kickoffSourceAlert,
+                        unhealthySourcesCount = unhealthySourcesCount,
+                        onOpenSourcesHub = {
+                            customizeInitialTab = 3
+                            mainViewModel.openCustomizeTeamsModal()
+                        }
+                    )
                 }
-                KickOffArenaHeaderCard(
-                    activeEdition = SetPlayEdition.PHONE,
-                    selectedCountryZone = selectedCountryZone,
-                    selectedSeasonTimeMode = selectedSeasonTimeMode,
-                    selectedMatchDay = selectedMatchDay,
-                    selectedTournamentFilter = selectedTournamentFilter,
-                    totalVisibleMatchesCount = sortedVisibleMatches.size,
-                    activeLeaguesInSlate = activeLeaguesInSlate,
-                    favoriteTeamsCount = favoriteTeams.size,
-                    liveMatchesCount = liveMatchesCount,
-                    isLoadingMatches = isLoadingMatches,
-                    liveScoreSyncState = liveScoreSyncState,
-                    sourceAlertMessage = kickoffSourceAlert,
-                    unhealthySourcesCount = unhealthySourcesCount,
-                    onRefreshMatches = { mainViewModel.refreshKickOffMatches(selectedMatchDay) },
-                    onOpenCountryZoneModal = { mainViewModel.openCountryZoneModal() },
-                    onOpenCustomizeModal = {
-                        customizeInitialTab = 0
-                        mainViewModel.openCustomizeTeamsModal()
-                    },
-                    onOpenSourcesHub = {
-                        customizeInitialTab = 3
-                        mainViewModel.openCustomizeTeamsModal()
-                    },
-                    onToggleLiveFilter = {
-                        mainViewModel.selectTournamentFilter(
-                            if (selectedTournamentFilter == "LIVE") "ALL" else "LIVE"
-                        )
-                    },
-                    onSelectMatchDay = { mainViewModel.selectMatchDay(it) }
-                )
             }
 
             // Pinned Matches ("My Games") Sticky Live Rail
@@ -477,6 +456,8 @@ fun HomeScreen(
                             customizeInitialTab = 1
                             mainViewModel.openCustomizeTeamsModal()
                         },
+                        isRefreshing = isLoadingMatches,
+                        onRefresh = { mainViewModel.refreshKickOffMatches(selectedMatchDay) },
                         activeEdition = SetPlayEdition.PHONE
                     )
 
@@ -1599,6 +1580,118 @@ private fun FiveDayMatchTimelineRibbon(
  * - Competition Deck Cards (`filter_chip_${tournament.tournamentId}`): Sorted by pinned -> active matches (`count > 0`) -> canonical priority.
  * - Trailing Action Card (`modify_tournaments_chip`): `"+ Leagues"` shortcut opening Hub Tab 1 (`Competitions`).
  */
+/** Plain text chip for the KickOff filter row (Live, Refresh): gold when selected. */
+@Composable
+private fun FilterTextChip(
+    label: String,
+    selected: Boolean,
+    height: Dp,
+    fontSize: TextUnit,
+    testTag: String,
+    onClick: () -> Unit,
+    leadingDot: Color? = null
+) {
+    Surface(
+        color = if (selected) KickoffPitchEmerald else KickoffTurfSurface,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(
+            width = if (selected) 1.3.dp else 0.85.dp,
+            color = if (selected) KickoffPitchEmerald else KickoffEmeraldBorder
+        ),
+        modifier = Modifier
+            .height(height)
+            .clip(RoundedCornerShape(12.dp))
+            .tvFocusableControl(
+                accentColor = KickoffFloodlightVolt,
+                shape = RoundedCornerShape(12.dp),
+                onClick = onClick
+            )
+            .testTag(testTag)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(horizontal = 14.dp)
+        ) {
+            if (leadingDot != null) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(if (selected) KickoffPitchBlack else leadingDot)
+                )
+                Spacer(modifier = Modifier.width(7.dp))
+            }
+            Text(
+                text = label,
+                color = if (selected) KickoffPitchBlack else KickoffFloodlightWhite,
+                fontSize = fontSize,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/** Slim strip shown above the KickOff list only when a live-score source needs attention. */
+@Composable
+private fun KickoffSourceAlertStrip(
+    sourceAlertMessage: String?,
+    unhealthySourcesCount: Int,
+    onOpenSourcesHub: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val message = sourceAlertMessage ?: if (unhealthySourcesCount == 1) {
+        "1 score source needs attention"
+    } else {
+        "$unhealthySourcesCount score sources need attention"
+    }
+    Surface(
+        color = KickoffTurfSurface,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, KickoffTrophyGold.copy(alpha = 0.55f)),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .tvFocusableControl(
+                shape = RoundedCornerShape(12.dp),
+                focusedScale = 1.0f,
+                onClick = onOpenSourcesHub
+            )
+            .testTag("kickoff_source_alert_strip")
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(KickoffTrophyGold)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = message,
+                color = KickoffFloodlightWhite,
+                fontSize = 13.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Fix",
+                color = KickoffTrophyGold,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
+    }
+}
+
 @Composable
 private fun TournamentFilterRow(
     selectedFilter: String,
@@ -1610,6 +1703,8 @@ private fun TournamentFilterRow(
     tournamentPreferences: List<TournamentPreferenceEntity>,
     onSelectFilter: (String) -> Unit,
     onOpenCustomize: () -> Unit,
+    isRefreshing: Boolean = false,
+    onRefresh: (() -> Unit)? = null,
     activeEdition: SetPlayEdition = SetPlayEdition.PHONE
 ) {
     val isTv = activeEdition == SetPlayEdition.TV
@@ -1726,6 +1821,22 @@ private fun TournamentFilterRow(
                         )
                     }
                 }
+            }
+        }
+
+        // "Live · N" — only while something is being played
+        if (liveCount > 0 || selectedFilter == "LIVE") {
+            item(key = "filter_live_chip") {
+                val isLiveSelected = selectedFilter == "LIVE"
+                FilterTextChip(
+                    label = if (liveCount > 0) "Live · $liveCount" else "Live",
+                    selected = isLiveSelected,
+                    height = cardHeight,
+                    fontSize = titleFontSize,
+                    leadingDot = KickoffLiveCrimson,
+                    testTag = "filter_chip_live",
+                    onClick = { onSelectFilter(if (isLiveSelected) "ALL" else "LIVE") }
+                )
             }
         }
 
@@ -1935,6 +2046,19 @@ private fun TournamentFilterRow(
                         fontWeight = FontWeight.ExtraBold
                     )
                 }
+            }
+        }
+
+        if (onRefresh != null) {
+            item(key = "refresh_matches_chip_item") {
+                FilterTextChip(
+                    label = if (isRefreshing) "Updating…" else "Refresh",
+                    selected = false,
+                    height = cardHeight,
+                    fontSize = titleFontSize,
+                    testTag = "refresh_matches_chip",
+                    onClick = onRefresh
+                )
             }
         }
     }
@@ -3613,29 +3737,14 @@ private fun TvKickoffStadiumScreen(
             )
         }
 
-        // Top 10-Foot Widescreen Command & Filter Deck
-        KickOffArenaHeaderCard(
-            activeEdition = SetPlayEdition.TV,
-            selectedCountryZone = selectedCountryZone,
-            selectedSeasonTimeMode = selectedSeasonTimeMode,
-            selectedMatchDay = selectedMatchDay,
-            selectedTournamentFilter = selectedTournamentFilter,
-            totalVisibleMatchesCount = sortedVisibleMatches.size,
-            activeLeaguesInSlate = sortedVisibleMatches.map { it.tournamentId }.distinct().size,
-            favoriteTeamsCount = favoriteTeams.size,
-            liveMatchesCount = liveMatchesCount,
-            isLoadingMatches = isLoadingMatches,
-            sourceAlertMessage = kickoffSourceAlert,
-            unhealthySourcesCount = unhealthySourcesCount,
-            onRefreshMatches = onRefreshMatches,
-            onOpenCountryZoneModal = onOpenCountryZoneModal,
-            onOpenCustomizeModal = { onOpenCustomizeModal(0) },
-            onOpenSourcesHub = { onOpenCustomizeModal(3) },
-            onToggleLiveFilter = {
-                onSelectFilter(if (selectedTournamentFilter == "LIVE") "ALL" else "LIVE")
-            },
-            onSelectMatchDay = onSelectMatchDay
-        )
+        // Score-source problems only (the title bar carries the counts; Live/Refresh are filter chips)
+        if (kickoffSourceAlert != null || unhealthySourcesCount > 0) {
+            KickoffSourceAlertStrip(
+                sourceAlertMessage = kickoffSourceAlert,
+                unhealthySourcesCount = unhealthySourcesCount,
+                onOpenSourcesHub = { onOpenCustomizeModal(3) }
+            )
+        }
 
         FiveDayMatchTimelineRibbon(
             selectedDay = selectedMatchDay,
@@ -3656,6 +3765,8 @@ private fun TvKickoffStadiumScreen(
             tournamentPreferences = tournamentPreferences,
             onSelectFilter = onSelectFilter,
             onOpenCustomize = { onOpenCustomizeModal(1) },
+            isRefreshing = isLoadingMatches,
+            onRefresh = onRefreshMatches,
             activeEdition = SetPlayEdition.TV
         )
 
@@ -3666,10 +3777,11 @@ private fun TvKickoffStadiumScreen(
                 .padding(horizontal = 14.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Left Pane (60% width): D-Pad 2-Column Fixture Grid
+            // Full-width D-Pad 2-column fixture grid (the prototype gives matches the whole width;
+            // the channel choice for a match is on its card and in Match Center)
             LazyColumn(
                 modifier = Modifier
-                    .weight(0.60f)
+                    .weight(1f)
                     .fillMaxHeight()
                     .testTag("match_center_list"),
                 contentPadding = PaddingValues(bottom = 48.dp),
@@ -3751,34 +3863,6 @@ private fun TvKickoffStadiumScreen(
                 }
             }
 
-            // Right Pane (40% width): Live Interactive Match Studio Dock
-            TvLiveMatchStudioDock(
-                match = focusedTvMatch ?: sortedVisibleMatches.firstOrNull(),
-                selectedCountryZone = selectedCountryZone,
-                selectedSeasonTimeMode = selectedSeasonTimeMode,
-                isPinned = focusedTvMatch?.matchId in pinnedMatchIds,
-                onWatchChannel = { ch ->
-                    val target = focusedTvMatch ?: sortedVisibleMatches.firstOrNull()
-                    if (target != null) {
-                        onWatchChannel(target, ch)
-                    }
-                },
-                onOpenFullDossier = {
-                    val target = focusedTvMatch ?: sortedVisibleMatches.firstOrNull()
-                    if (target != null) {
-                        onOpenDossier(target)
-                    }
-                },
-                onTogglePin = {
-                    val target = focusedTvMatch ?: sortedVisibleMatches.firstOrNull()
-                    if (target != null) {
-                        onTogglePinMatch(target.matchId)
-                    }
-                },
-                modifier = Modifier
-                    .weight(0.40f)
-                    .fillMaxHeight()
-            )
         }
     }
 }

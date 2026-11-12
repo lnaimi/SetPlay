@@ -863,16 +863,19 @@ fun MainAppContent(
                         // Coming back from the rail with → returns to the item last focused in this section.
                         .tvContentFocusRestorer()
                 ) {
-                    if (currentScreen.isCinema()) {
-                        CinemaSegmentedToggle(
-                            selected = if (currentScreen == AppScreen.SERIES) VodTab.SERIES else VodTab.MOVIES,
-                            onSelect = { tab ->
-                                mainViewModel.setScreen(if (tab == VodTab.SERIES) AppScreen.SERIES else AppScreen.MOVIES)
-                            },
-                            modifier = Modifier
-                                .padding(start = 28.dp, top = 16.dp, end = 28.dp)
-                                .width(260.dp)
-                        )
+                    TvSectionHeader(
+                        currentScreen = currentScreen,
+                        sectionDetailSummary = topSectionDetailText
+                    ) {
+                        if (currentScreen.isCinema()) {
+                            CinemaSegmentedToggle(
+                                selected = if (currentScreen == AppScreen.SERIES) VodTab.SERIES else VodTab.MOVIES,
+                                onSelect = { tab ->
+                                    mainViewModel.setScreen(if (tab == VodTab.SERIES) AppScreen.SERIES else AppScreen.MOVIES)
+                                },
+                                modifier = Modifier.width(260.dp)
+                            )
+                        }
                     }
                     renderMainScreenContent(Modifier.weight(1f))
                     TvRemoteHintBar(
