@@ -3,7 +3,7 @@
 # ⚽ Set `▶` **Play** 🎬
 ### *The Luxury Dual-APK (Phone + Android TV 10-Foot) MENA Sports Match Center & High-Scale Xtream IPTV Cinema Suite*
 
-[![Build & Release SetPlay APK](https://img.shields.io/github/actions/workflow/status/MPadberg-svg/SetPlay/android-apk-release.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=Dual-APK%20Release)](https://github.com/lnaimi/SetPlay/actions/workflows/android-apk-release.yml)
+[![Build & Release SetPlay APK](https://img.shields.io/github/actions/workflow/status/lnaimi/SetPlay/android-apk-release.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=Dual-APK%20Release)](https://github.com/lnaimi/SetPlay/actions/workflows/android-apk-release.yml)
 [![Download SetPlay-Phone.apk](https://img.shields.io/badge/📱_Phone_APK-SetPlay--Phone.apk-14919B?style=for-the-badge&logo=android&logoColor=white)](https://github.com/lnaimi/SetPlay/releases/latest/download/SetPlay-Phone.apk)
 [![Download SetPlay-TV.apk](https://img.shields.io/badge/📺_Android_TV_APK-SetPlay--TV.apk-FFB800?style=for-the-badge&logo=androidtv&logoColor=06131C)](https://github.com/lnaimi/SetPlay/releases/latest/download/SetPlay-TV.apk)
 [![Kotlin & Jetpack Compose](https://img.shields.io/badge/Kotlin_2.0-Jetpack_Compose_M3-F07167?style=for-the-badge&logo=jetpackcompose&logoColor=white)](#)
